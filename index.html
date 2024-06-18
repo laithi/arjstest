@@ -1,19 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hotel AR Tracker</title>
+  <title>World Object AR Effect</title>
   <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/1.7.7/aframe/build/aframe-ar.js"></script>
+  <script src="https://unpkg.com/aframe-look-at-component@1.0.0/dist/aframe-look-at-component.min.js"></script>
 </head>
 <body style="margin: 0; overflow: hidden;">
-  <a-scene embedded arjs='sourceType: webcam;'>
-    <a-assets>
-      <a-asset-item id="hotel-room-model" src="path/to/your-hotel-room-model.glb"></a-asset-item>
-    </a-assets>
-    <a-marker type="pattern" url="path/to/your-marker.patt">
-      <a-entity gltf-model="#hotel-room-model" scale="0.05 0.05 0.05" position="0 0 0"></a-entity>
-    </a-marker>
-    <a-entity camera></a-entity>
+  <a-scene
+    embedded
+    arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
+  >
+    <!-- 3D Model -->
+    <a-entity
+      position="0 0 0"
+      gltf-model="url(https://drive.google.com/file/d/171NdQowc9AUBdktqddP52YH2lo5YEGOm/view?usp=sharing)"
+      scale="0.05 0.05 0.05"
+      look-at="[camera]"
+    >
+    </a-entity>
+    <a-camera></a-camera>
   </a-scene>
 </body>
 </html>
