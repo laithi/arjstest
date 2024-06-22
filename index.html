@@ -9,10 +9,25 @@
   <style>
     body, html { margin: 0; padding: 0; overflow: hidden; }
     video { display: none; }
-    canvas { position: absolute; top: 0; left: 0; }
+    canvas { position: absolute; top: 0; left: 0; z-index: 1; }
+    .arjs-loader {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2;
+    }
+    .arjs-loader div { text-align: center; }
   </style>
 </head>
 <body>
+  <div class="arjs-loader">
+    <div>Loading, please wait...</div>
+  </div>
   <video id="video" width="640" height="480" autoplay muted></video>
   <canvas id="canvas" width="640" height="480"></canvas>
   <a-scene embedded arjs>
@@ -20,41 +35,54 @@
     <a-entity camera></a-entity>
   </a-scene>
   <script>
-    // Start video stream
-    navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
-      var video = document.getElementById('video');
-      video.srcObject = stream;
-      video.play();
-    }).catch(function(error) {
-      console.error("Error accessing the camera", error);
-    });
+    document.addEventListener("DOMContentLoaded", function() {
+      // Start video stream
+      navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
+        var video = document.getElementById('video');
+        video.srcObject = stream;
+        video.play();
 
-    // Initialize face tracker
-    var tracker = new tracking.ObjectTracker('face');
-    tracker.setInitialScale(4);
-    tracker.setStepSize(2);
-    tracker.setEdgesDensity(0.1);
+        // Initialize face tracker
+        var tracker = new tracking.ObjectTracker('face');
+        tracker.setInitialScale(4);
+        tracker.setStepSize(2);
+        tracker.setEdgesDensity(0.1);
 
-    tracking.track('#video', tracker);
+        tracking.track('#video', tracker);
 
-    tracker.on('track', function(event) {
-      var canvas = document.getElementById('canvas');
-      var context = canvas.getContext('2d');
-      context.clearRect(0, 0, canvas.width, canvas.height);
+        tracker.on('track', function(event) {
+          var canvas = document.getElementById('canvas');
+          var context = canvas.getContext('2d');
+          context.clearRect(0, 0, canvas.width, canvas.height);
 
-      var box = document.getElementById('face-box');
+          var box = document.getElementById('face-box');
 
-      event.data.forEach(function(rect) {
-        context.strokeStyle = '#a64ceb';
-        context.strokeRect(rect.x, rect.y, rect.width, rect.height);
-        context.font = '11px Helvetica';
-        context.fillStyle = "#fff";
-        context.fillText('Face', rect.x + rect.width + 5, rect.y + 11);
+          if (event.data.length === 0) {
+            box.setAttribute('visible', 'false');
+          } else {
+            box.setAttribute('visible', 'true');
+          }
 
-        var x = (rect.x + rect.width / 2) / canvas.width * 2 - 1;
-        var y = (rect.y + rect.height / 2) / canvas.height * -2 + 1;
+          event.data.forEach(function(rect) {
+            context.strokeStyle = '#a64ceb';
+            context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+            context.font = '11px Helvetica';
+            context.fillStyle = "#fff";
+            context.fillText('Face', rect.x + rect.width + 5, rect.y + 11);
 
-        box.setAttribute('position', { x: x, y: y, z: -3 });
+            var x = (rect.x + rect.width / 2) / canvas.width * 2 - 1;
+            var y = (rect.y + rect.height / 2) / canvas.height * -2 + 1;
+
+            box.setAttribute('position', { x: x, y: y, z: -3 });
+          });
+        });
+
+        window.addEventListener('arjs-video-loaded', function() {
+          document.querySelector('.arjs-loader').style.display = 'none';
+        });
+
+      }).catch(function(error) {
+        console.error("Error accessing the camera", error);
       });
     });
   </script>
