@@ -1,91 +1,59 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Face Tracking with AR.js</title>
-  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-  <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.0.0/aframe/build/aframe-ar.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking.js/1.1.3/tracking-min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking.js/1.1.3/data/face-min.js"></script>
-  <style>
-    body, html { margin: 0; padding: 0; overflow: hidden; }
-    video { display: none; }
-    canvas { position: absolute; top: 0; left: 0; z-index: 1; }
-    .arjs-loader {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 2;
-    }
-    .arjs-loader div { text-align: center; }
-  </style>
-</head>
-<body>
-  <div class="arjs-loader">
-    <div>Loading, please wait...</div>
-  </div>
-  <video id="video" width="640" height="480" autoplay muted></video>
-  <canvas id="canvas" width="640" height="480"></canvas>
-  <a-scene embedded arjs>
-    <a-box id="face-box" color="red" depth="0.1" height="0.1" width="0.1" position="0 0 -3"></a-box>
-    <a-entity camera></a-entity>
-  </a-scene>
-  <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      // Start video stream
-      navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
-        var video = document.getElementById('video');
-        video.srcObject = stream;
-        video.play();
+  <head>
+    <title>AR.js Carnival Arch</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar-nft.js"></script>
+    <style>
+      body { margin: 0; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <a-scene embedded arjs>
+      <!-- Marker Definition -->
+      <a-nft
+        type="nft"
+        url="path/to/your/nft/marker"
+        smooth="true"
+        smoothCount="10"
+        smoothTolerance="0.01"
+        smoothThreshold="5">
+        <!-- 3D Model or Object -->
+        <a-entity
+          geometry="primitive: plane; height: 3; width: 6"
+          material="src: #carnivalArchTexture"
+          position="0 1.5 0"
+          rotation="0 0 0"
+          scale="1 1 1">
+        </a-entity>
+      </a-nft>
 
-        // Initialize face tracker
-        var tracker = new tracking.ObjectTracker('face');
-        tracker.setInitialScale(4);
-        tracker.setStepSize(2);
-        tracker.setEdgesDensity(0.1);
+      <!-- Camera -->
+      <a-entity camera></a-entity>
+    </a-scene>
 
-        tracking.track('#video', tracker);
-
-        tracker.on('track', function(event) {
-          var canvas = document.getElementById('canvas');
-          var context = canvas.getContext('2d');
-          context.clearRect(0, 0, canvas.width, canvas.height);
-
-          var box = document.getElementById('face-box');
-
-          if (event.data.length === 0) {
-            box.setAttribute('visible', 'false');
-          } else {
-            box.setAttribute('visible', 'true');
-          }
-
-          event.data.forEach(function(rect) {
-            context.strokeStyle = '#a64ceb';
-            context.strokeRect(rect.x, rect.y, rect.width, rect.height);
-            context.font = '11px Helvetica';
-            context.fillStyle = "#fff";
-            context.fillText('Face', rect.x + rect.width + 5, rect.y + 11);
-
-            var x = (rect.x + rect.width / 2) / canvas.width * 2 - 1;
-            var y = (rect.y + rect.height / 2) / canvas.height * -2 + 1;
-
-            box.setAttribute('position', { x: x, y: y, z: -3 });
+    <script>
+      AFRAME.registerComponent('animate-arch', {
+        init: function () {
+          const el = this.el;
+          el.setAttribute('animation', {
+            property: 'position',
+            to: '0 2 0',
+            dir: 'alternate',
+            loop: true,
+            dur: 2000,
+            easing: 'easeInOutSine'
           });
-        });
-
-        window.addEventListener('arjs-video-loaded', function() {
-          document.querySelector('.arjs-loader').style.display = 'none';
-        });
-
-      }).catch(function(error) {
-        console.error("Error accessing the camera", error);
-        alert("Error accessing the camera: " + error.message);
+        }
       });
-    });
-  </script>
-</body>
+
+      // Apply the animation component to the entity
+      document.querySelector('a-entity[geometry]').setAttribute('animate-arch', '');
+    </script>
+
+    <!-- Add your texture here -->
+    <a-assets>
+      <img id="carnivalArchTexture" src="path/to/your/texture.jpg" />
+    </a-assets>
+  </body>
 </html>
