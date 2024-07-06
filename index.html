@@ -66,6 +66,9 @@
         loader.load('https://github.com/laithi/arjstest/blob/main/untitled.glb', function (gltf) {
           var model = gltf.scene;
           depthScene.add(model);
+          console.log('Model loaded successfully');
+        }, undefined, function (error) {
+          console.error('An error happened', error);
         });
 
         // Render loop
