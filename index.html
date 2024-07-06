@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AR.js Depth Effect</title>
+  <title>AR.js Depth Effect with 3D Model</title>
   <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/jeromeetienne/ar.js/1.7.6/aframe/build/aframe-ar.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://threejs.org/examples/js/loaders/GLTFLoader.js"></script>
+
   <style>
     body { margin: 0; overflow: hidden; }
   </style>
@@ -59,18 +61,12 @@
         light.position.set(10, 10, 10);
         depthScene.add(light);
 
-        // Create a plane with a depth effect
-        var geometry = new THREE.PlaneGeometry(1, 1);
-        var material = new THREE.ShaderMaterial({
-          vertexShader: document.getElementById('vertexShader').textContent,
-          fragmentShader: document.getElementById('fragmentShader').textContent,
-          uniforms: {
-            depthTexture: { type: 't', value: new THREE.TextureLoader().load('depth-map.png') }
-          }
+        // Load a 3D model
+        var loader = new THREE.GLTFLoader();
+        loader.load('https://github.com/laithi/arjstest/blob/main/future%20museum.gltf', function (gltf) {
+          var model = gltf.scene;
+          depthScene.add(model);
         });
-
-        var plane = new THREE.Mesh(geometry, material);
-        depthScene.add(plane);
 
         // Render loop
         function animate() {
