@@ -1,87 +1,66 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>AR.js Depth Effect with 3D Model</title>
-  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-  <script src="https://cdn.rawgit.com/jeromeetienne/ar.js/1.7.6/aframe/build/aframe-ar.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://threejs.org/examples/js/loaders/GLTFLoader.js"></script>
+  <head>
+    <title>AR.js Falling Models with Balloons</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://rawgit.com/jeromeetienne/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  </head>
+  <body style="margin: 0; overflow: hidden;">
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+      <!-- Marker -->
+      <a-marker preset="hiro">
+        <!-- 3D Models with Balloons -->
+        <a-entity id="models" position="0 2 0">
+          <a-entity gltf-model="#model" position="0 0 0"></a-entity>
+        </a-entity>
+        <!-- Light and Shadow -->
+        <a-entity light="type: directional; intensity: 0.8;" position="-1 1 0" castShadow></a-entity>
+        <a-plane position="0 0 0" rotation="-90 0 0" width="20" height="20" color="#7BC8A4" shadow="receive: true"></a-plane>
+      </a-marker>
+      <!-- Camera -->
+      <a-entity camera></a-entity>
+    </a-scene>
 
-  <style>
-    body { margin: 0; overflow: hidden; }
-  </style>
-</head>
-<body>
-  <a-scene embedded arjs="sourceType: webcam;">
-    <a-marker preset="hiro">
-      <a-entity id="depth-scene"></a-entity>
-    </a-marker>
-    <a-entity camera></a-entity>
-  </a-scene>
+    <!-- 3D Model -->
+    <a-assets>
+      <a-asset-item id="model" src="path/to/your/model.gltf"></a-asset-item>
+    </a-assets>
 
-  <script id="vertexShader" type="x-shader/x-vertex">
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  </script>
+    <script>
+      // JavaScript for Animation and Shadow
+      AFRAME.registerComponent('falling-model', {
+        init: function () {
+          this.el.object3D.traverse(function (node) {
+            if (node.isMesh) {
+              node.castShadow = true;
+              node.receiveShadow = true;
+            }
+          });
 
-  <script id="fragmentShader" type="x-shader/x-fragment">
-    varying vec2 vUv;
-    uniform sampler2D depthTexture;
-    
-    void main() {
-      vec4 depth = texture2D(depthTexture, vUv);
-      float depthValue = depth.r; // Assuming depth is stored in the red channel
-      gl_FragColor = vec4(depthValue, depthValue, depthValue, 1.0);
-    }
-  </script>
+          // Falling animation
+          this.el.setAttribute('animation', {
+            property: 'position',
+            to: '0 -2 0',
+            dur: 5000,
+            easing: 'easeInQuad',
+            loop: true
+          });
 
-  <script>
-    AFRAME.registerComponent('init-depth-scene', {
-      init: function () {
-        var el = this.el;
-        var scene = el.object3D;
-
-        // Create a Three.js scene
-        var depthScene = new THREE.Scene();
-
-        // Create a camera
-        var camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 1000);
-        camera.position.z = 5;
-
-        // Create a renderer
-        var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
-
-        // Add light
-        var light = new THREE.PointLight(0xffffff, 1, 100);
-        light.position.set(10, 10, 10);
-        depthScene.add(light);
-
-        // Load a 3D model
-        var loader = new THREE.GLTFLoader();
-        loader.load('https://github.com/laithi/arjstest/blob/main/untitled.glb', function (gltf) {
-          var model = gltf.scene;
-          depthScene.add(model);
-          console.log('Model loaded successfully');
-        }, undefined, function (error) {
-          console.error('An error happened', error);
-        });
-
-        // Render loop
-        function animate() {
-          requestAnimationFrame(animate);
-          renderer.render(depthScene, camera);
+          // Rotate animation
+          this.el.setAttribute('animation__rotate', {
+            property: 'rotation',
+            to: '0 360 0',
+            dur: 10000,
+            easing: 'linear',
+            loop: true
+          });
         }
-        animate();
-      }
-    });
+      });
 
-    // Attach the component to the A-Frame entity
-    document.querySelector('#depth-scene').setAttribute('init-depth-scene', '');
-  </script>
-</body>
+      document.querySelectorAll('#models a-entity').forEach(function (entity) {
+        entity.setAttribute('falling-model', '');
+      });
+    </script>
+  </body>
 </html>
