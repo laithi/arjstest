@@ -1,74 +1,104 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AR.js Falling Models with Balloons</title>
-  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-  <script src="https://rawgit.com/jeromeetienne/AR.js/master/aframe/build/aframe-ar.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <title>WebXR Makeup Effect</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/facemesh"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/libs/webxr/VRButton.js"></script>
 </head>
-<body style="margin: 0; overflow: hidden;">
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-    <!-- Marker -->
-    <a-marker preset="hiro" id="marker">
-      <!-- 3D Models with Balloons -->
-      <a-entity id="models" position="0 2 0">
-        <a-entity gltf-model="#model" position="0 0 0"></a-entity>
-      </a-entity>
-      <!-- Light and Shadow -->
-      <a-entity light="type: directional; intensity: 0.8;" position="-1 1 0" castShadow></a-entity>
-      <a-plane position="0 0 0" rotation="-90 0 0" width="20" height="20" color="#7BC8A4" shadow="receive: true"></a-plane>
-    </a-marker>
-    <!-- Camera -->
-    <a-entity camera></a-entity>
-  </a-scene>
-
-  <!-- 3D Model -->
-  <a-assets>
-    <a-asset-item id="model" src="https://github.com/laithi/arjstest/blob/main/future%20museum.gltf"></a-asset-item>
-  </a-assets>
-
+<body>
   <script>
-    // JavaScript for Animation and Shadow
-    AFRAME.registerComponent('falling-model', {
-      init: function () {
-        this.el.object3D.traverse(function (node) {
-          if (node.isMesh) {
-            node.castShadow = true;
-            node.receiveShadow = true;
-          }
-        });
-      },
-      startFalling: function () {
-        // Falling animation
-        this.el.setAttribute('animation', {
-          property: 'position',
-          to: '0 -2 0',
-          dur: 5000,
-          easing: 'easeInQuad',
-          loop: true
-        });
+    let camera, scene, renderer;
+    let makeupMesh;
 
-        // Rotate animation
-        this.el.setAttribute('animation__rotate', {
-          property: 'rotation',
-          to: '0 360 0',
-          dur: 10000,
-          easing: 'linear',
-          loop: true
-        });
-      }
-    });
+    async function init() {
+      // Set up the scene
+      scene = new THREE.Scene();
 
-    document.addEventListener('DOMContentLoaded', function () {
-      const marker = document.querySelector('#marker');
-      const models = document.querySelectorAll('#models a-entity');
+      // Set up the camera
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 1.6, 0);
 
-      marker.addEventListener('markerFound', function () {
-        models.forEach(function (entity) {
-          entity.components['falling-model'].startFalling();
-        });
+      // Set up the renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      document.body.appendChild(renderer.domElement);
+      document.body.appendChild(VRButton.createButton(renderer));
+      renderer.xr.enabled = true;
+
+      // Add light to the scene
+      const light = new THREE.DirectionalLight(0xffffff, 1);
+      light.position.set(1, 1, 1).normalize();
+      scene.add(light);
+
+      // Load the makeup model (e.g., lipstick)
+      const loader = new THREE.GLTFLoader();
+      loader.load('path/to/your/makeup_model.gltf', function (gltf) {
+        makeupMesh = gltf.scene;
+        scene.add(makeupMesh);
       });
-    });
+
+      // Initialize face tracking
+      const video = document.createElement('video');
+      video.width = window.innerWidth;
+      video.height = window.innerHeight;
+      video.style.display = 'none';
+      document.body.appendChild(video);
+
+      const faceMeshModel = await facemesh.load();
+      await setupCamera(video);
+
+      video.play();
+      detectFace(video, faceMeshModel);
+    }
+
+    async function setupCamera(video) {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+
+      return new Promise((resolve) => {
+        video.onloadedmetadata = () => {
+          resolve(video);
+        };
+      });
+    }
+
+    async function detectFace(video, faceMeshModel) {
+      const predictions = await faceMeshModel.estimateFaces(video);
+      if (predictions.length > 0) {
+        const keypoints = predictions[0].scaledMesh;
+        // Apply the makeup effect based on the facial landmarks
+        applyMakeup(keypoints);
+      }
+      requestAnimationFrame(() => detectFace(video, faceMeshModel));
+    }
+
+    function applyMakeup(keypoints) {
+      if (!makeupMesh) return;
+      // Update the position and orientation of the makeup model based on facial landmarks
+      // For example, positioning lipstick on the lips
+      const lipTop = keypoints[13];
+      const lipBottom = keypoints[14];
+
+      makeupMesh.position.set((lipTop[0] + lipBottom[0]) / 2, (lipTop[1] + lipBottom[1]) / 2, (lipTop[2] + lipBottom[2]) / 2);
+      // Adjust rotation and scale as needed
+    }
+
+    function animate() {
+      renderer.setAnimationLoop(render);
+    }
+
+    function render() {
+      renderer.render(scene, camera);
+    }
+
+    init().then(animate);
   </script>
 </body>
 </html>
