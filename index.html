@@ -8,8 +8,9 @@
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/facemesh"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/libs/webxr/VRButton.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js"></script>
 </head>
 <body>
   <script>
@@ -42,6 +43,8 @@
       loader.load('path/to/your/makeup_model.gltf', function (gltf) {
         makeupMesh = gltf.scene;
         scene.add(makeupMesh);
+      }, undefined, function (error) {
+        console.error('Error loading makeup model:', error);
       });
 
       // Initialize face tracking
@@ -98,7 +101,9 @@
       renderer.render(scene, camera);
     }
 
-    init().then(animate);
+    init().then(animate).catch((error) => {
+      console.error('Error initializing AR makeup effect:', error);
+    });
   </script>
 </body>
 </html>
