@@ -13,9 +13,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@webxr-input-profiles/motion-controllers@1.0.0/dist/motion-controllers.module.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/VRButton.js"></script>
-
+    
     <script>
-        let scene, camera, renderer, cube, session;
+        let scene, camera, renderer, cube;
 
         function initScene() {
             // إنشاء المشهد
@@ -42,9 +42,7 @@
             light.position.set(1, 1, 1).normalize();
             scene.add(light);
 
-            // إضافة زر VR
-            document.body.appendChild(VRButton.createButton(renderer));
-
+            
             // التعامل مع تغيير حجم النافذة
             window.addEventListener('resize', onWindowResize, false);
         }
@@ -56,7 +54,7 @@
         }
 
         // تحريك المجسم
-        function animate(timestamp, frame) {
+        function animate() {
             cube.rotation.x += 0.01;
             cube.rotation.y += 0.01;
 
@@ -65,18 +63,7 @@
 
         // بدء حلقة التحريك مع دعم WebXR
         function startXR() {
-            // Request an XRSession
-            navigator.xr.requestSession('immersive-vr').then(s => {
-                session = s;
-                // Start the XR animation loop
-                session.requestAnimationFrame(animate); 
-
-                // Handle session events
-                session.addEventListener('end', () => {
-                    // Reset the animation loop when the session ends
-                    renderer.setAnimationLoop(null);
-                });
-            });
+            renderer.setAnimationLoop(animate);
         }
 
         initScene();
