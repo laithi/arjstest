@@ -1,13 +1,29 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <title>Three.js Scene</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden; /* Prevent scrollbars */
+      }
+    </style>
+  </head>
+  <body>
+    <script src="https://threejs.org/build/three.min.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html><!DOCTYPE html>
+<html>
+  <head>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/0.7.1/aframe.min.js"></script>
     <script src="https://threejs.org/build/three.min.js"></script>
     <script src="https://unpkg.com/a-camera-controls@0.1.1/dist/a-camera-controls.min.js"></script>
     <script src="script.js"></script>
   </head>
   <body>
-    <a-scene physics="debug: true"> <a-camera id="myCamera" position="0 1.6 0"></a-camera>
+    <a-scene>
+      <a-camera id="myCamera" position="0 1.6 0"></a-camera>
       <a-gltf-model id="myModel" position="0 0 -3" src="model.gltf"></a-gltf-model>
       <a-box position="-1 0.5 -3" rotation="0 45 0" color="#4CC3D9"></a-box>
       <a-sphere position="0 1.25 -5" radius="1.25" color="#EF2D5E"></a-sphere>
