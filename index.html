@@ -1,25 +1,20 @@
 <!DOCTYPE html>
-<html lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>مطعم AR</title>
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-</head>
-<body style="margin: 0; overflow: hidden;">
-    <a-scene embedded arjs>
-        <!-- علامة للموقع يتم عندها عرض النموذج -->
-        <a-marker preset="hiro">
-            <!-- نموذج الطعام الأول -->
-            <a-entity gltf-model="url(https://github.com/laithi/arjstest/blob/main/untitled.glb)" scale="0.5 0.5 0.5" position="0 0.5 0"></a-entity>
-            <!-- نموذج الطعام الثاني -->
-            <a-entity gltf-model="url(https://github.com/laithi/arjstest/blob/main/untitled.glb)" scale="0.5 0.5 0.5" position="1 0.5 0"></a-entity>
-            <!-- نموذج الطعام الثالث -->
-            <a-entity gltf-model="url(https://github.com/laithi/arjstest/blob/main/untitled.glb)" scale="0.5 0.5 0.5" position="-1 0.5 0"></a-entity>
-        </a-marker>
-        <!-- الكاميرا -->
-        <a-entity camera></a-entity>
+<html>
+  <head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/0.7.1/aframe.min.js"></script>
+    <script src="https://threejs.org/build/three.min.js"></script>
+    <script src="https://unpkg.com/a-camera-controls@0.1.1/dist/a-camera-controls.min.js"></script>
+    <script src="script.js"></script>
+  </head>
+  <body>
+    <a-scene>
+      <a-camera id="myCamera" position="0 1.6 0"></a-camera>
+      <a-gltf-model id="myModel" position="0 0 -3" src="model.gltf"></a-gltf-model>
+      <a-box position="-1 0.5 -3" rotation="0 45 0" color="#4CC3D9"></a-box>
+      <a-sphere position="0 1.25 -5" radius="1.25" color="#EF2D5E"></a-sphere>
+      <a-cylinder position="1 0.75 -3" radius="0.5" height="1.5" color="#FFC65D"></a-cylinder>
+      <a-plane position="0 0 -4" rotation="-90 0 0" width="4" height="4" color="#7BC8A4"></a-plane>
+      <a-sky color="#ECECEC"></a-sky>
     </a-scene>
-</body>
+  </body>
 </html>
