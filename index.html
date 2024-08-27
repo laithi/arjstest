@@ -1,35 +1,65 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Three.js Scene</title>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebXR Example</title>
     <style>
-      body {
-        margin: 0;
-        overflow: hidden; /* Prevent scrollbars */
-      }
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
     </style>
-  </head>
-  <body>
-    <script src="https://threejs.org/build/three.min.js"></script>
-    <script src="script.js"></script>
-  </body>
-</html><!DOCTYPE html>
-<html>
-  <head>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/0.7.1/aframe.min.js"></script>
-    <script src="https://threejs.org/build/three.min.js"></script>
-    <script src="https://unpkg.com/a-camera-controls@0.1.1/dist/a-camera-controls.min.js"></script>
-    <script src="script.js"></script>
-  </head>
-  <body>
-    <a-scene>
-      <a-camera id="myCamera" position="0 1.6 0"></a-camera>
-      <a-gltf-model id="myModel" position="0 0 -3" src="model.gltf"></a-gltf-model>
-      <a-box position="-1 0.5 -3" rotation="0 45 0" color="#4CC3D9"></a-box>
-      <a-sphere position="0 1.25 -5" radius="1.25" color="#EF2D5E"></a-sphere>
-      <a-cylinder position="1 0.75 -3" radius="0.5" height="1.5" color="#FFC65D"></a-cylinder>
-      <a-plane position="0 0 -4" rotation="-90 0 0" width="4" height="4" color="#7BC8A4"></a-plane>
-      <a-sky color="#ECECEC"></a-sky>
-    </a-scene>
-  </body>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, cube;
+
+        // إنشاء المشهد
+        function initScene() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // إضافة مكعب إلى المشهد
+            const geometry = new THREE.BoxGeometry();
+            const material = new THREE.MeshBasicMaterial({ color: 0x0077ff });
+            cube = new THREE.Mesh(geometry, material);
+            scene.add(cube);
+
+            camera.position.set(0, 1.6, 3);
+
+            window.addEventListener('resize', onWindowResize, false);
+
+            // تمكين WebXR
+            renderer.xr.enabled = true;
+            document.body.appendChild(VRButton.createButton(renderer));
+        }
+
+        // التحديث عند تغيير حجم النافذة
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // تحريك المكعب
+        function animate() {
+            cube.rotation.x += 0.01;
+            cube.rotation.y += 0.01;
+
+            renderer.render(scene, camera);
+        }
+
+        // بدء تجربة WebXR
+        function startXR() {
+            renderer.setAnimationLoop(animate);
+        }
+
+        initScene();
+        startXR();
+    </script>
+</body>
 </html>
