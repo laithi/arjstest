@@ -2,23 +2,31 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>WebAR World-Anchored 3D Object with Recording</title>
+    <title>WebAR World-Anchored 3D Object with Mobile-Friendly Recording</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex-location-only.js"></script>
     <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
     <style>
-        #recordButton {
+        #recordButton, #downloadButton {
             position: fixed;
-            top: 10px;
-            right: 10px;
             z-index: 1000;
             padding: 10px;
-            background-color: red;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+        }
+        #recordButton {
+            top: 10px;
+            right: 10px;
+            background-color: red;
+        }
+        #downloadButton {
+            top: 10px;
+            left: 10px;
+            background-color: green;
+            display: none;
         }
     </style>
 </head>
@@ -52,15 +60,18 @@
     </div>
 
     <button id="recordButton">Start Recording</button>
+    <a id="downloadButton" download="ar-recording.webm">Download Recording</a>
 
     <script>
-        // ... (previous script content remains the same) ...
+        // ... (previous gesture handling script content remains the same) ...
 
         // New recording functionality
         let mediaRecorder;
         let recordedChunks = [];
 
         const recordButton = document.getElementById('recordButton');
+        const downloadButton = document.getElementById('downloadButton');
+
         recordButton.addEventListener('click', toggleRecording);
 
         async function toggleRecording() {
@@ -69,8 +80,9 @@
                 recordButton.textContent = 'Start Recording';
                 recordButton.style.backgroundColor = 'red';
             } else {
-                const stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { mediaSource: 'screen' }
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false
                 });
 
                 mediaRecorder = new MediaRecorder(stream);
@@ -86,19 +98,15 @@
                         type: 'video/webm'
                     });
                     const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    document.body.appendChild(a);
-                    a.style = 'display: none';
-                    a.href = url;
-                    a.download = 'ar-recording.webm';
-                    a.click();
-                    window.URL.revokeObjectURL(url);
+                    downloadButton.href = url;
+                    downloadButton.style.display = 'block';
                     recordedChunks = [];
                 };
 
                 mediaRecorder.start();
                 recordButton.textContent = 'Stop Recording';
                 recordButton.style.backgroundColor = 'green';
+                downloadButton.style.display = 'none';
             }
         }
     </script>
