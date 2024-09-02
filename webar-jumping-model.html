@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>WebAR Jumping 3D Model (Markerless)</title>
+    <title>WebAR Moving Cube (Markerless)</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 </head>
@@ -11,7 +11,7 @@
         <a-entity id="camera" camera position="0 1.6 0"></a-entity>
         
         <a-box position="0 0 -3" material="color: red;" scale="0.5 0.5 0.5" class="clickable"
-               animation="property: position; to: 0 0.5 -3; dur: 300; easing: easeInOutQuad; loop: false; dir: alternate; startEvents: click">
+               animation="property: position; to: 0 1 -3; dur: 300; easing: easeInOutQuad; loop: false; startEvents: click">
         </a-box>
     </a-scene>
 
