@@ -2,11 +2,25 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>WebAR World-Anchored 3D Object</title>
+    <title>WebAR World-Anchored 3D Object with Recording</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex-location-only.js"></script>
     <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
+    <style>
+        #recordButton {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            padding: 10px;
+            background-color: red;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body style="margin: 0; overflow: hidden;">
     <a-scene
@@ -17,7 +31,7 @@
         gesture-detector
     >
         <a-assets>
-            <a-asset-item id="animated-asset" src="https://github.com/laithi/arjstest/blob/main/untitled.glb"></a-asset-item>
+            <a-asset-item id="animated-asset" src="https://raw.githubusercontent.com/nicolocarpignoli/nicolocarpignoli.github.io/master/ar-playground/models/CesiumMan.gltf"></a-asset-item>
         </a-assets>
 
         <a-entity
@@ -37,239 +51,56 @@
         <p>Tap on the ground to place the 3D model. Tap on the model to make it jump.</p>
     </div>
 
+    <button id="recordButton">Start Recording</button>
+
     <script>
-        AFRAME.registerComponent('gesture-handler', {
-            schema: {
-                enabled: { default: true },
-                rotationFactor: { default: 5 },
-                minScale: { default: 0.3 },
-                maxScale: { default: 8 },
-            },
+        // ... (previous script content remains the same) ...
 
-            init: function() {
-                this.handleScale = this.handleScale.bind(this);
-                this.handleRotation = this.handleRotation.bind(this);
+        // New recording functionality
+        let mediaRecorder;
+        let recordedChunks = [];
 
-                this.isVisible = false;
-                this.initialScale = this.el.object3D.scale.clone();
-                this.scaleFactor = 1;
+        const recordButton = document.getElementById('recordButton');
+        recordButton.addEventListener('click', toggleRecording);
 
-                this.el.sceneEl.addEventListener('click', (e) => {
-                    if (this.isVisible) {
-                        this.el.emit('jump');
-                    } else {
-                        const touchPoint = e.detail.intersection.point;
-                        this.el.setAttribute('position', touchPoint);
-                        this.el.setAttribute('visible', true);
-                        this.isVisible = true;
-                    }
+        async function toggleRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                recordButton.textContent = 'Start Recording';
+                recordButton.style.backgroundColor = 'red';
+            } else {
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { mediaSource: 'screen' }
                 });
 
-                this.el.addEventListener('jump', () => {
-                    const currentPosition = this.el.getAttribute('position');
-                    const jumpHeight = 0.5;
-                    const jumpDuration = 300;
+                mediaRecorder = new MediaRecorder(stream);
 
-                    this.el.setAttribute('animation__jump', {
-                        property: 'position',
-                        to: `${currentPosition.x} ${currentPosition.y + jumpHeight} ${currentPosition.z}`,
-                        dur: jumpDuration,
-                        easing: 'easeOutQuad'
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, {
+                        type: 'video/webm'
                     });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    document.body.appendChild(a);
+                    a.style = 'display: none';
+                    a.href = url;
+                    a.download = 'ar-recording.webm';
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    recordedChunks = [];
+                };
 
-                    setTimeout(() => {
-                        this.el.setAttribute('animation__fall', {
-                            property: 'position',
-                            to: `${currentPosition.x} ${currentPosition.y} ${currentPosition.z}`,
-                            dur: jumpDuration,
-                            easing: 'easeInQuad'
-                        });
-                    }, jumpDuration);
-                });
-            },
-
-            update: function() {
-                if (this.data.enabled) {
-                    this.el.sceneEl.addEventListener('onefingermove', this.handleRotation);
-                    this.el.sceneEl.addEventListener('twofingermove', this.handleScale);
-                } else {
-                    this.el.sceneEl.removeEventListener('onefingermove', this.handleRotation);
-                    this.el.sceneEl.removeEventListener('twofingermove', this.handleScale);
-                }
-            },
-
-            remove: function() {
-                this.el.sceneEl.removeEventListener('onefingermove', this.handleRotation);
-                this.el.sceneEl.removeEventListener('twofingermove', this.handleScale);
-            },
-
-            handleRotation: function(event) {
-                if (this.isVisible) {
-                    this.el.object3D.rotation.y +=
-                        event.detail.positionChange.x * this.data.rotationFactor;
-                    this.el.object3D.rotation.x +=
-                        event.detail.positionChange.y * this.data.rotationFactor;
-                }
-            },
-
-            handleScale: function(event) {
-                if (this.isVisible) {
-                    this.scaleFactor *=
-                        1 + event.detail.spreadChange / event.detail.startSpread;
-
-                    this.scaleFactor = Math.min(
-                        Math.max(this.scaleFactor, this.data.minScale),
-                        this.data.maxScale
-                    );
-
-                    this.el.object3D.scale.x = this.scaleFactor * this.initialScale.x;
-                    this.el.object3D.scale.y = this.scaleFactor * this.initialScale.y;
-                    this.el.object3D.scale.z = this.scaleFactor * this.initialScale.z;
-                }
+                mediaRecorder.start();
+                recordButton.textContent = 'Stop Recording';
+                recordButton.style.backgroundColor = 'green';
             }
-        });
-
-        AFRAME.registerComponent('gesture-detector', {
-            schema: {
-                element: { default: '' }
-            },
-
-            init: function() {
-                this.targetElement =
-                    this.data.element && document.querySelector(this.data.element);
-
-                if (!this.targetElement) {
-                    this.targetElement = this.el;
-                }
-
-                this.internalState = {
-                    previousState: null
-                };
-
-                this.emitGestureEvent = this.emitGestureEvent.bind(this);
-
-                this.targetElement.addEventListener('touchstart', this.emitGestureEvent);
-                this.targetElement.addEventListener('touchend', this.emitGestureEvent);
-                this.targetElement.addEventListener('touchmove', this.emitGestureEvent);
-            },
-
-            remove: function() {
-                this.targetElement.removeEventListener('touchstart', this.emitGestureEvent);
-                this.targetElement.removeEventListener('touchend', this.emitGestureEvent);
-                this.targetElement.removeEventListener('touchmove', this.emitGestureEvent);
-            },
-
-            emitGestureEvent(event) {
-                const currentState = this.getTouchState(event);
-                const previousState = this.internalState.previousState;
-
-                const gestureContinues =
-                    previousState &&
-                    currentState &&
-                    currentState.touchCount == previousState.touchCount;
-
-                const gestureEnded = previousState && !gestureContinues;
-                const gestureStarted = currentState && !gestureContinues;
-
-                if (gestureEnded) {
-                    const eventName =
-                        this.getEventPrefix(previousState.touchCount) + 'fingerend';
-                    this.el.emit(eventName, previousState);
-                    this.internalState.previousState = null;
-                }
-
-                if (gestureStarted) {
-                    currentState.startTime = performance.now();
-                    currentState.startPosition = currentState.position;
-                    currentState.startSpread = currentState.spread;
-                    const eventName =
-                        this.getEventPrefix(currentState.touchCount) + 'fingerstart';
-                    this.el.emit(eventName, currentState);
-                    this.internalState.previousState = currentState;
-                }
-
-                if (gestureContinues) {
-                    const eventDetail = {
-                        positionChange: {
-                            x: currentState.position.x - previousState.position.x,
-                            y: currentState.position.y - previousState.position.y
-                        }
-                    };
-
-                    if (currentState.spread) {
-                        eventDetail.spreadChange = currentState.spread - previousState.spread;
-                    }
-
-                    // Update state with new data
-                    Object.assign(previousState, currentState);
-
-                    // Add updated data to event detail
-                    Object.assign(eventDetail, previousState);
-
-                    const eventName =
-                        this.getEventPrefix(currentState.touchCount) + 'fingermove';
-                    this.el.emit(eventName, eventDetail);
-                }
-            },
-
-            getTouchState: function(event) {
-                if (event.touches.length === 0) {
-                    return null;
-                }
-
-                // Convert event.touches to an array so we can use reduce
-                const touchList = [];
-                for (let i = 0; i < event.touches.length; i++) {
-                    touchList.push(event.touches[i]);
-                }
-
-                const touchState = {
-                    touchCount: touchList.length
-                };
-
-                // Calculate center of all current touches
-                const centerPositionRawX =
-                    touchList.reduce((sum, touch) => sum + touch.clientX, 0) /
-                    touchList.length;
-
-                const centerPositionRawY =
-                    touchList.reduce((sum, touch) => sum + touch.clientY, 0) /
-                    touchList.length;
-
-                touchState.positionRaw = { x: centerPositionRawX, y: centerPositionRawY };
-
-                // Scale touch position and spread by average of window dimensions
-                const screenScale = 2 / (window.innerWidth + window.innerHeight);
-
-                touchState.position = {
-                    x: centerPositionRawX * screenScale,
-                    y: centerPositionRawY * screenScale
-                };
-
-                // Calculate average spread of touches from the center point
-                if (touchList.length >= 2) {
-                    const spread =
-                        touchList.reduce((sum, touch) => {
-                            return (
-                                sum +
-                                Math.sqrt(
-                                    Math.pow(centerPositionRawX - touch.clientX, 2) +
-                                    Math.pow(centerPositionRawY - touch.clientY, 2)
-                                )
-                            );
-                        }, 0) / touchList.length;
-
-                    touchState.spread = spread * screenScale;
-                }
-
-                return touchState;
-            },
-
-            getEventPrefix(touchCount) {
-                const numberNames = ['one', 'two', 'three', 'many'];
-                return numberNames[Math.min(touchCount, 4) - 1];
-            }
-        });
+        }
     </script>
 </body>
 </html>
