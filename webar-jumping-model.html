@@ -2,16 +2,17 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>WebAR Jumping 3D Model</title>
+    <title>WebAR Jumping 3D Model (Markerless)</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 </head>
 <body style="margin: 0; overflow: hidden;">
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-        <a-marker preset="hiro">
-            <a-box position="0 0.5 0" material="color: red;" scale="1 1 1" class="clickable" animation="property: position; to: 0 1.5 0; dur: 300; easing: easeInOutQuad; loop: false; dir: alternate; startEvents: click"></a-box>
-        </a-marker>
-        <a-entity camera></a-entity>
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;">
+        <a-entity id="camera" camera position="0 1.6 0"></a-entity>
+        
+        <a-box position="0 0 -3" material="color: red;" scale="0.5 0.5 0.5" class="clickable"
+               animation="property: position; to: 0 0.5 -3; dur: 300; easing: easeInOutQuad; loop: false; dir: alternate; startEvents: click">
+        </a-box>
     </a-scene>
 
     <script>
@@ -21,6 +22,20 @@
                     this.emit('click');
                 });
             }
+        });
+
+        // Ensure the scene is loaded before trying to access elements
+        document.querySelector('a-scene').addEventListener('loaded', function () {
+            var box = document.querySelector('a-box');
+            var camera = document.querySelector('#camera');
+            
+            // Position the box in front of the camera
+            var cameraPosition = camera.getAttribute('position');
+            box.setAttribute('position', {
+                x: cameraPosition.x,
+                y: cameraPosition.y - 0.5,
+                z: cameraPosition.z - 3
+            });
         });
     </script>
 </body>
