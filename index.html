@@ -3,7 +3,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>AR.js Bouncing Cube with Recording</title>
+    <title>AR.js 3D World with Bouncing Cube</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
@@ -52,7 +52,6 @@
             let mediaRecorder;
             let recordedChunks = [];
 
-            // Recording functionality
             recordButton.addEventListener('click', function() {
                 if (mediaRecorder && mediaRecorder.state === 'recording') {
                     mediaRecorder.stop();
@@ -87,7 +86,6 @@
                 }
             });
 
-            // Image capture functionality
             captureButton.addEventListener('click', function() {
                 const canvas = document.querySelector('a-scene').components.screenshot.getCanvas('perspective');
                 const imageDataUrl = canvas.toDataURL('image/png');
@@ -100,3 +98,4 @@
     </script>
 </body>
 </html>
+
