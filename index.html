@@ -1,107 +1,80 @@
 
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <meta charset="utf-8">
-    <title>AR.js 3D World with Bouncing Cube</title>
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-    <style>
-        .ar-controls {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            display: flex;
-            gap: 10px;
-        }
-        .ar-button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-    </style>
-</head>
-<body style="margin: 0; overflow: hidden;">
-    <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;' vr-mode-ui="enabled: false">
-        <a-entity position="0 1.5 -3">
-            <a-box position="0 0 0" rotation="0 45 0" color="#4CC3D9" scale="0.5 0.5 0.5">
-                <a-animation attribute="position"
-                             dur="2000"
-                             direction="alternate"
-                             easing="ease-in-out-cubic"
-                             to="0 0.5 0"
-                             repeat="indefinite"></a-animation>
-            </a-box>
-        </a-entity>
-        <a-entity camera look-controls></a-entity>
-    </a-scene>
+    <head>
+        <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
+        <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+        <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
+        <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
+        <script>
+            AFRAME.registerComponent('videohandler', {
+                init: function () {
+                    var marker = this.el;
+                    this.vid = document.querySelector("#vid");
 
-    <div class="ar-controls">
-        <button id="recordButton" class="ar-button">Start Recording</button>
-        <button id="captureButton" class="ar-button">Capture Image</button>
-    </div>
+                    marker.addEventListener('markerFound', function () {
+                        this.toggle = true;
+                        this.vid.play();
+                    }.bind(this));
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const recordButton = document.getElementById('recordButton');
-            const captureButton = document.getElementById('captureButton');
-            let mediaRecorder;
-            let recordedChunks = [];
-
-            recordButton.addEventListener('click', function() {
-                if (mediaRecorder && mediaRecorder.state === 'recording') {
-                    mediaRecorder.stop();
-                    recordButton.textContent = 'Start Recording';
-                } else {
-                    navigator.mediaDevices.getDisplayMedia({ video: true })
-                        .then(stream => {
-                            mediaRecorder = new MediaRecorder(stream);
-                            mediaRecorder.ondataavailable = event => {
-                                if (event.data.size > 0) {
-                                    recordedChunks.push(event.data);
-                                }
-                            };
-                            mediaRecorder.onstop = () => {
-                                const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.style.display = 'none';
-                                a.href = url;
-                                a.download = 'ar-recording.webm';
-                                document.body.appendChild(a);
-                                a.click();
-                                setTimeout(() => {
-                                    document.body.removeChild(a);
-                                    window.URL.revokeObjectURL(url);
-                                }, 100);
-                                recordedChunks = [];
-                            };
-                            mediaRecorder.start();
-                            recordButton.textContent = 'Stop Recording';
-                        });
-                }
+                    marker.addEventListener('markerLost', function () {
+                        this.toggle = false;
+                        this.vid.pause();
+                    }.bind(this));
+                },
             });
+        </script>
+    </head>
 
-            captureButton.addEventListener('click', function() {
-                const canvas = document.querySelector('a-scene').components.screenshot.getCanvas('perspective');
-                const imageDataUrl = canvas.toDataURL('image/png');
-                const a = document.createElement('a');
-                a.href = imageDataUrl;
-                a.download = 'ar-capture.png';
-                a.click();
-            });
-        });
-    </script>
-</body>
+    <body style="margin: 0; overflow: hidden;">
+        <a-scene
+            vr-mode-ui="enabled: false"
+            loading-screen="enabled: false;"
+            arjs='sourceType: webcam; debugUIEnabled: false;'
+            id="scene"
+            embedded
+            gesture-detector
+        >
+            <a-assets>
+                <video
+                    id="vid"
+                    src="assets/asset.mp4"
+                    preload="auto"
+                    response-type="arraybuffer"
+                    loop
+                    crossorigin
+                    webkit-playsinline
+                    autoplay
+                    muted
+                    playsinline
+                ></video>
+            </a-assets>
+
+            <a-marker
+                type="pattern"
+                preset="custom"
+                url="assets/marker.patt"
+                videohandler
+                smooth="true"
+                smoothCount="10"
+                smoothTolerance="0.01"
+                smoothThreshold="5"
+                raycaster="objects: .clickable"
+                emitevents="true"
+                cursor="fuse: false; rayOrigin: mouse;"
+                id="markerA"
+            >
+                <a-video
+                    src="#vid"
+                    scale="1 1 1"
+                    position="0 0.1 0"
+                    rotation="-90 0 0"
+                    class="clickable"
+                    gesture-handler
+                ></a-video>
+            </a-marker>
+
+            <a-entity camera></a-entity>
+        </a-scene>
+    </body>
 </html>
-
-
-
-
-
