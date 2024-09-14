@@ -1,105 +1,105 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>WebAR World Effect Cube</title>
-    <!-- تضمين مكتبة A-Frame -->
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <!-- تضمين مكتبة AR لتطبيقات WebXR -->
-    <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.3.2/aframe/build/aframe-ar-nft.js"></script>
-  </head>
-  <body style="margin: 0; overflow: hidden;">
-    <!-- مشهد A-Frame مع خصائص WebXR -->
-    <a-scene
-      embedded
-      vr-mode-ui="enabled: false"
-      renderer="antialias: true; alpha: true"
-      webxr="requiredFeatures: hit-test; optionalFeatures: local-floor, bounded-floor;"
-    >
-      <!-- مكعب يظهر في المساحة الحقيقية -->
-      <a-box
-        id="cube"
-        visible="false"
-        depth="0.5"
-        height="0.5"
-        width="0.5"
-        color="#4CC3D9"
-        animation="property: position; dir: alternate; dur: 1000; loop: true; to: 0 0.5 0"
-        gesture-handler
-      ></a-box>
+<head>
+  <meta charset="utf-8">
+  <title>تأثير WebAR مع إيماءات المستخدم</title>
+  <!-- تضمين A-Frame -->
+  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+  <!-- تضمين AR.js -->
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <!-- تضمين Hammer.js -->
+  <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #instructions {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="instructions">
+    استخدم إيماءات اللمس لتكبير/تصغير وتدوير الكائن.
+  </div>
+  <a-scene embedded arjs>
+    <!-- كائن ثلاثي الأبعاد -->
+    <a-box position="0 0.5 0" color="red" id="my-box"></a-box>
+    <!-- كاميرا الواقع المعزز -->
+    <a-camera-static></a-camera-static>
+  </a-scene>
 
-      <!-- كاميرا -->
-      <a-camera
-        raycaster="objects: .clickable"
-        cursor="fuse: false; rayOrigin: mouse;"
-      ></a-camera>
-    </a-scene>
+  <script>
+    // الحصول على الكائن الثلاثي الأبعاد
+    const box = document.getElementById('my-box');
 
-    <!-- مكون لوضع الكائن على الأسطح المكتشفة -->
-    <script>
-      AFRAME.registerComponent('surface-placer', {
-        init: function () {
-          const scene = this.el.sceneEl;
-          const cube = document.getElementById('cube');
-          let hitTestSource = null;
-          let viewerSpace = null;
-          let xrSession = null;
+    // إنشاء مدير Hammer.js للمشهد
+    const sceneEl = document.querySelector('a-scene').sceneEl.canvas;
 
-          scene.renderer.xr.addEventListener('sessionstart', async () => {
-            xrSession = scene.renderer.xr.getSession();
-            const viewerSpace = await xrSession.requestReferenceSpace('viewer');
-            hitTestSource = await xrSession.requestHitTestSource({ space: viewerSpace });
-          });
+    // التأكد من جاهزية المشهد قبل التفاعل
+    if (sceneEl) {
+      initializeGestures(sceneEl);
+    } else {
+      document.querySelector('a-scene').addEventListener('render-target-loaded', function() {
+        initializeGestures(this.sceneEl.canvas);
+      });
+    }
 
-          scene.addEventListener('click', (event) => {
-            if (!hitTestSource) return;
+    function initializeGestures(element) {
+      const mc = new Hammer.Manager(element);
 
-            const frame = event.detail.frame;
-            const referenceSpace = scene.renderer.xr.getReferenceSpace();
-            const hitTestResults = frame.getHitTestResults(hitTestSource);
+      // تعريف التعرفات
+      const pinch = new Hammer.Pinch();
+      const rotate = new Hammer.Rotate();
+      const pan = new Hammer.Pan();
 
-            if (hitTestResults.length > 0) {
-              const hit = hitTestResults[0];
-              const pose = hit.getPose(referenceSpace);
-              cube.setAttribute('position', pose.transform.position);
-              cube.setAttribute('visible', 'true');
-            }
-          });
-        }
+      // استخدامهم بشكل منفصل
+      pinch.recognizeWith(rotate);
+
+      mc.add([pinch, rotate, pan]);
+
+      let initialScale = 1;
+      let currentScale = 1;
+      let initialRotation = 0;
+      let currentRotation = 0;
+      let initialPosition = { x: 0, y: 0 };
+      let currentPosition = { x: 0, y: 0 };
+
+      mc.on('pinchstart', function(ev) {
+        initialScale = currentScale;
       });
 
-      // إضافة المكون إلى المشهد
-      document.querySelector('a-scene').setAttribute('surface-placer', '');
-    </script>
-
-    <!-- مكون Gesture Handler للتفاعل مع المكعب -->
-    <script>
-      AFRAME.registerComponent('gesture-handler', {
-        init: function () {
-          const cube = this.el;
-          let isDragging = false;
-          let startRotation = null;
-
-          cube.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            startRotation = cube.getAttribute('rotation');
-          });
-
-          window.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            let movementX = e.movementX;
-            let rotation = {
-              x: startRotation.x,
-              y: startRotation.y + movementX * 0.5,
-              z: startRotation.z
-            };
-            cube.setAttribute('rotation', rotation);
-          });
-
-          window.addEventListener('mouseup', () => {
-            isDragging = false;
-          });
-        }
+      mc.on('pinchmove', function(ev) {
+        currentScale = initialScale * ev.scale;
+        box.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
       });
-    </script>
-  </body>
+
+      mc.on('rotatestart', function(ev) {
+        initialRotation = currentRotation;
+      });
+
+      mc.on('rotatemove', function(ev) {
+        currentRotation = initialRotation + ev.rotation;
+        box.setAttribute('rotation', `0 ${currentRotation} 0`);
+      });
+
+      mc.on('panstart', function(ev) {
+        initialPosition = { x: currentPosition.x, y: currentPosition.y };
+      });
+
+      mc.on('panmove', function(ev) {
+        currentPosition.x = initialPosition.x + ev.deltaX / 100;
+        currentPosition.y = initialPosition.y - ev.deltaY / 100;
+        box.setAttribute('position', `${currentPosition.x} 0.5 ${currentPosition.y}`);
+      });
+    }
+  </script>
+</body>
 </html>
