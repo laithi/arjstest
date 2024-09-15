@@ -1,105 +1,98 @@
 <!DOCTYPE html>
-<html>
+<html lang="ar">
 <head>
-  <meta charset="utf-8">
-  <title>تأثير WebAR مع إيماءات المستخدم</title>
-  <!-- تضمين A-Frame -->
-  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-  <!-- تضمين AR.js -->
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-  <!-- تضمين Hammer.js -->
-  <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
+  <meta charset="UTF-8">
+  <title>تلوين منطقة العينين باللون الأحمر</title>
   <style>
     body { margin: 0; overflow: hidden; }
-    #instructions {
+    #jeelizFaceFilterCanvas {
       position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: white;
-      font-family: sans-serif;
-      text-align: center;
-      background: rgba(0, 0, 0, 0.5);
-      padding: 10px;
-      border-radius: 5px;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
     }
   </style>
+  <!-- تضمين مكتبة Jeeliz FaceFilter -->
+  <script src="https://cdn.jsdelivr.net/npm/jeelizfacefilter@1/dist/jeelizFaceFilter.js"></script>
+  <!-- تضمين Three.js -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
 </head>
 <body>
-  <div id="instructions">
-    استخدم إيماءات اللمس لتكبير/تصغير وتدوير الكائن.
-  </div>
-  <a-scene embedded arjs>
-    <!-- كائن ثلاثي الأبعاد -->
-    <a-box position="0 0.5 0" color="red" id="my-box"></a-box>
-    <!-- كاميرا الواقع المعزز -->
-    <a-camera-static></a-camera-static>
-  </a-scene>
+  <canvas id="jeelizFaceFilterCanvas"></canvas>
 
   <script>
-    // الحصول على الكائن الثلاثي الأبعاد
-    const box = document.getElementById('my-box');
+    // المتغيرات العامة
+    let threeCamera;
 
-    // إنشاء مدير Hammer.js للمشهد
-    const sceneEl = document.querySelector('a-scene').sceneEl.canvas;
-
-    // التأكد من جاهزية المشهد قبل التفاعل
-    if (sceneEl) {
-      initializeGestures(sceneEl);
-    } else {
-      document.querySelector('a-scene').addEventListener('render-target-loaded', function() {
-        initializeGestures(this.sceneEl.canvas);
+    // وظيفة البدء
+    function main() {
+      JEELIZFACEFILTER.init({
+        canvasId: 'jeelizFaceFilterCanvas',
+        NNCpath: 'https://cdn.jsdelivr.net/npm/jeelizfacefilter@1/dist/', // مسار ملفات الشبكة العصبية
+        callbackReady: function(errCode, spec) {
+          if (errCode) {
+            console.log('خطأ في التهيئة: ', errCode);
+            return;
+          }
+          console.log('Jeeliz FaceFilter جاهز');
+          initThreeScene(spec);
+        },
+        callbackTrack: function(detectState) {
+          if (threeCamera) {
+            JEELIZFACEFILTER.render_threeScene(detectState, threeCamera);
+          }
+        }
       });
     }
 
-    function initializeGestures(element) {
-      const mc = new Hammer.Manager(element);
+    // تهيئة مشهد Three.js
+    function initThreeScene(spec) {
+      const threeScene = new THREE.Scene();
 
-      // تعريف التعرفات
-      const pinch = new Hammer.Pinch();
-      const rotate = new Hammer.Rotate();
-      const pan = new Hammer.Pan();
+      // إعداد الكاميرا
+      threeCamera = new THREE.PerspectiveCamera(40, spec.canvasElement.width / spec.canvasElement.height, 0.1, 100);
+      threeCamera.position.z = 5;
 
-      // استخدامهم بشكل منفصل
-      pinch.recognizeWith(rotate);
+      // إضافة إضاءة
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+      threeScene.add(ambientLight);
 
-      mc.add([pinch, rotate, pan]);
-
-      let initialScale = 1;
-      let currentScale = 1;
-      let initialRotation = 0;
-      let currentRotation = 0;
-      let initialPosition = { x: 0, y: 0 };
-      let currentPosition = { x: 0, y: 0 };
-
-      mc.on('pinchstart', function(ev) {
-        initialScale = currentScale;
+      // إنشاء مادة حمراء شفافة
+      const redMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        transparent: true,
+        opacity: 0.5
       });
 
-      mc.on('pinchmove', function(ev) {
-        currentScale = initialScale * ev.scale;
-        box.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
-      });
+      // إنشاء هندسة القناع لمنطقة العينين
+      const eyeMaskGeometry = new THREE.PlaneGeometry(2, 0.5);
+      const eyeMaskMesh = new THREE.Mesh(eyeMaskGeometry, redMaterial);
+      eyeMaskMesh.position.set(0, 0.2, 0);
+      eyeMaskMesh.frustumCulled = false;
 
-      mc.on('rotatestart', function(ev) {
-        initialRotation = currentRotation;
-      });
+      // إضافة القناع إلى المشهد
+      threeScene.add(eyeMaskMesh);
 
-      mc.on('rotatemove', function(ev) {
-        currentRotation = initialRotation + ev.rotation;
-        box.setAttribute('rotation', `0 ${currentRotation} 0`);
-      });
+      // تهيئة الكائن ثلاثي الأبعاد للرأس الافتراضي
+      JEELIZFACEFILTER.set_threexScene(threeScene);
 
-      mc.on('panstart', function(ev) {
-        initialPosition = { x: currentPosition.x, y: currentPosition.y };
-      });
+      // تحديث موقع القناع بناءً على تتبع الوجه
+      JEELIZFACEFILTER.on_render(function(detectState){
+        if (detectState.isDetected) {
+          const headScale = detectState.scale;
+          const headX = detectState.x;
+          const headY = detectState.y;
 
-      mc.on('panmove', function(ev) {
-        currentPosition.x = initialPosition.x + ev.deltaX / 100;
-        currentPosition.y = initialPosition.y - ev.deltaY / 100;
-        box.setAttribute('position', `${currentPosition.x} 0.5 ${currentPosition.y}`);
+          // تحديث المقياس والموقع
+          eyeMaskMesh.position.set(headX, headY + 0.05, 0);
+          eyeMaskMesh.scale.set(headScale * 1.5, headScale * 0.5, 1);
+        }
       });
     }
+
+    // بدء التطبيق
+    main();
   </script>
 </body>
 </html>
