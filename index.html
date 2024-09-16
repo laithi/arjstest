@@ -1,84 +1,106 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8">
-  <title>تلوين منطقة العينين باللون الأحمر</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    #jeelizFaceFilterCanvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-    }
-  </style>
-  <!-- تضمين مكتبة Jeeliz FaceFilter -->
-  <script src="https://cdn.jsdelivr.net/npm/jeelizfacefilter@1.1.2/dist/jeelizFaceFilter.min.js"></script>
-  <!-- تضمين Three.js -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+    <meta charset="UTF-8">
+    <title>تعديل لون العيون إلى الأخضر</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        video { display: none; }
+        canvas { display: block; }
+    </style>
 </head>
 <body>
-  <canvas id="jeelizFaceFilterCanvas"></canvas>
+    <!-- إضافة عناصر HTML ضرورية -->
+    <video id="video" autoplay playsinline></video>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.153/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.153/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.153/examples/jsm/webxr/VRButton.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.3/dist/face-landmarks-detection.js"></script>
+    <script>
+        let scene, camera, renderer;
+        let video, videoTexture;
+        let model;
+        let eyeMeshes = [];
 
-  <script>
-    // المتغيرات العامة
-    let threeCamera, threeScene, renderer, faceMesh;
+        async function init() {
+            // إعداد الفيديو
+            video = document.getElementById('video');
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
 
-    // وظيفة البدء
-    function main() {
-      JEELIZFACEFILTER.init({
-        canvasId: 'jeelizFaceFilterCanvas',
-        NNCpath: 'https://cdn.jsdelivr.net/npm/jeelizfacefilter@1.1.2/dist/', // مسار ملفات الشبكة العصبية
-        callbackReady: function(errCode, spec) {
-          if (errCode) {
-            console.log('خطأ في التهيئة: ', errCode);
-            return;
-          }
-          console.log('Jeeliz FaceFilter جاهز');
-          initThreeScene(spec);
-        },
-        callbackTrack: function(detectState) {
-          if (threeCamera) {
-            JEELIZFACEFILTER.render_three(detectState, threeCamera);
-          }
+            // إعداد Three.js
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
+            camera.position.z = 1;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+            document.body.appendChild(renderer.domElement);
+            document.body.appendChild(VRButton.createButton(renderer));
+
+            // إضافة خلفية الفيديو
+            videoTexture = new THREE.VideoTexture(video);
+            const videoMaterial = new THREE.MeshBasicMaterial({ map: videoTexture });
+            const videoGeometry = new THREE.PlaneGeometry(2, 2);
+            const videoMesh = new THREE.Mesh(videoGeometry, videoMaterial);
+            scene.add(videoMesh);
+
+            // تحميل نموذج الكشف عن ملامح الوجه
+            model = await faceLandmarksDetection.load(
+                faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
+            );
+
+            // إنشاء مواد العيون
+            const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            const eyeGeometry = new THREE.CircleGeometry(0.03, 32);
+
+            for (let i = 0; i < 2; i++) {
+                const eyeMesh = new THREE.Mesh(eyeGeometry, eyeMaterial);
+                eyeMeshes.push(eyeMesh);
+                scene.add(eyeMesh);
+            }
+
+            renderer.setAnimationLoop(render);
         }
-      });
-    }
 
-    // تهيئة مشهد Three.js
-    function initThreeScene(spec) {
-      threeScene = new THREE.Scene();
+        async function render() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                const predictions = await model.estimateFaces({
+                    input: video,
+                    flipHorizontal: false
+                });
 
-      // إعداد الكاميرا
-      threeCamera = new THREE.PerspectiveCamera(1, spec.canvasElement.width / spec.canvasElement.height, 0.1, 100);
-      threeCamera.position.z = 0;
+                if (predictions.length > 0) {
+                    const keypoints = predictions[0].scaledMesh;
 
-      // إعداد الإضاءة
-      const ambientLight = new THREE.AmbientLight(0xffffff, 1);
-      threeScene.add(ambientLight);
+                    // إحداثيات العين اليسرى واليمنى
+                    const leftEyeCoords = keypoints[33];  // العين اليسرى
+                    const rightEyeCoords = keypoints[263]; // العين اليمنى
 
-      // إنشاء مادة حمراء شفافة
-      const redMaterial = new THREE.MeshBasicMaterial({
-        color: 0xff0000,
-        transparent: true,
-        opacity: 0.5,
-        side: THREE.DoubleSide
-      });
+                    // تحويل إحداثيات الفيديو إلى نظام إحداثيات Three.js
+                    const leftEyePosition = convertCoords(leftEyeCoords);
+                    const rightEyePosition = convertCoords(rightEyeCoords);
 
-      // إنشاء هندسة القناع لمنطقة العينين باستخدام PlaneGeometry
-      const eyeMaskGeometry = new THREE.PlaneGeometry(0.6, 0.2);
-      faceMesh = new THREE.Mesh(eyeMaskGeometry, redMaterial);
-      faceMesh.position.set(0, 0.05, 0.5); // تم تعديل الموضع
-      faceMesh.rotation.x = Math.PI; // تدوير القناع لمواجهة الكاميرا
-      threeScene.add(faceMesh);
+                    // تحديث موقع شبكات العيون
+                    eyeMeshes[0].position.set(leftEyePosition.x, leftEyePosition.y, 0.01);
+                    eyeMeshes[1].position.set(rightEyePosition.x, rightEyePosition.y, 0.01);
+                }
+            }
 
-      // إعداد الكائن ثلاثي الأبعاد للرأس الافتراضي
-      JEELIZFACEFILTER.set_threeScene(threeScene);
-    }
+            renderer.render(scene, camera);
+        }
 
-    // بدء التطبيق
-    main();
-  </script>
+        function convertCoords(coords) {
+            // تحويل إحداثيات MediaPipe إلى نظام إحداثيات Three.js
+            const x = (coords[0] / video.videoWidth) * 2 - 1;
+            const y = -(coords[1] / video.videoHeight) * 2 + 1;
+            return new THREE.Vector3(x, y, 0);
+        }
+
+        init();
+    </script>
 </body>
 </html>
