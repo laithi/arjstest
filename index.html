@@ -7,11 +7,20 @@
         body { margin: 0; overflow: hidden; }
         video { display: none; }
         canvas { display: block; }
+        #captureBtn {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
     <!-- إضافة عناصر HTML ضرورية -->
     <video id="video" autoplay playsinline></video>
+    <button id="captureBtn">التقاط صورة</button>
     <script src="https://cdn.jsdelivr.net/npm/three@0.153/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.153/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.153/examples/jsm/webxr/VRButton.js"></script>
@@ -63,6 +72,12 @@
                 scene.add(eyeMesh);
             }
 
+            // إضافة حدث الزر
+            const captureBtn = document.getElementById('captureBtn');
+            captureBtn.addEventListener('click', captureImage);
+
+            window.addEventListener('resize', onWindowResize, false);
+
             renderer.setAnimationLoop(render);
         }
 
@@ -98,6 +113,26 @@
             const x = (coords[0] / video.videoWidth) * 2 - 1;
             const y = -(coords[1] / video.videoHeight) * 2 + 1;
             return new THREE.Vector3(x, y, 0);
+        }
+
+        function captureImage() {
+            // التقاط الصورة من الـ Renderer
+            renderer.domElement.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'صورة.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
         init();
