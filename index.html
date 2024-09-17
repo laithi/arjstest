@@ -2,151 +2,42 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <title>تعديل لون العيون إلى الأخضر</title>
-    <style>
-        body { margin: 0; overflow: hidden; }
-        video { display: none; }
-        canvas { display: block; }
-        #captureBtn {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 1;
-            padding: 10px 20px;
-            font-size: 16px;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تعديل لون العيون باستخدام WebXR</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-face-aframe.prod.js"></script>
 </head>
 <body>
-    <!-- إضافة عناصر HTML ضرورية -->
-    <video id="video" autoplay playsinline></video>
-    <button id="captureBtn">التقاط صورة</button>
-    <canvas id="outputCanvas"></canvas>
-    
-    <script src="https://cdn.jsdelivr.net/npm/three@0.153/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.153/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.153/examples/jsm/webxr/VRButton.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.3/dist/face-landmarks-detection.js"></script>
+    <a-scene mindar-face embedded color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+        <a-camera active="false" position="0 0 0"></a-camera>
+
+        <a-entity mindar-face-target="anchorIndex: 168">
+            <a-sphere id="leftEye" position="-0.035 0.033 -0.05" scale="0.01 0.01 0.01" color="green"></a-sphere>
+        </a-entity>
+
+        <a-entity mindar-face-target="anchorIndex: 387">
+            <a-sphere id="rightEye" position="0.035 0.033 -0.05" scale="0.01 0.01 0.01" color="green"></a-sphere>
+        </a-entity>
+    </a-scene>
+
     <script>
-        let scene, camera, renderer;
-        let video, videoTexture;
-        let model;
-        let eyeMeshes = [];
+        document.addEventListener("DOMContentLoaded", function() {
+            const sceneEl = document.querySelector('a-scene');
+            const leftEye = document.querySelector('#leftEye');
+            const rightEye = document.querySelector('#rightEye');
 
-        async function init() {
-            // إعداد الفيديو
-            video = document.getElementById('video');
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
-
-            // إعداد Three.js
-            scene = new THREE.Scene();
-
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
-            camera.position.z = 1;
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true;
-            document.body.appendChild(renderer.domElement);
-            document.body.appendChild(VRButton.createButton(renderer));
-
-            // إضافة خلفية الفيديو
-            videoTexture = new THREE.VideoTexture(video);
-            const videoMaterial = new THREE.MeshBasicMaterial({ map: videoTexture });
-            const videoGeometry = new THREE.PlaneGeometry(2, 2);
-            const videoMesh = new THREE.Mesh(videoGeometry, videoMaterial);
-            scene.add(videoMesh);
-
-            // تحميل نموذج الكشف عن ملامح الوجه
-            model = await faceLandmarksDetection.load(
-                faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
-            );
-
-            // إنشاء مواد العيون
-            const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-            const eyeGeometry = new THREE.CircleGeometry(0.03, 32);
-
-            for (let i = 0; i < 2; i++) {
-                const eyeMesh = new THREE.Mesh(eyeGeometry, eyeMaterial);
-                eyeMeshes.push(eyeMesh);
-                scene.add(eyeMesh);
-            }
-
-            // إضافة حدث الزر
-            const captureBtn = document.getElementById('captureBtn');
-            captureBtn.addEventListener('click', captureImage);
-
-            window.addEventListener('resize', onWindowResize, false);
-
-            renderer.setAnimationLoop(render);
-        }
-
-        async function render() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                const predictions = await model.estimateFaces({
-                    input: video,
-                    flipHorizontal: false
-                });
-
-                if (predictions.length > 0) {
-                    const keypoints = predictions[0].scaledMesh;
-
-                    // إحداثيات العين اليسرى واليمنى
-                    const leftEyeCoords = keypoints[33];  // العين اليسرى
-                    const rightEyeCoords = keypoints[263]; // العين اليمنى
-
-                    // تحويل إحداثيات الفيديو إلى نظام إحداثيات Three.js
-                    const leftEyePosition = convertCoords(leftEyeCoords);
-                    const rightEyePosition = convertCoords(rightEyeCoords);
-
-                    // تحديث موقع شبكات العيون
-                    eyeMeshes[0].position.set(leftEyePosition.x, leftEyePosition.y, 0.01);
-                    eyeMeshes[1].position.set(rightEyePosition.x, rightEyePosition.y, 0.01);
-                }
-            }
-
-            renderer.render(scene, camera);
-        }
-
-        function convertCoords(coords) {
-            // تحويل إحداثيات MediaPipe إلى نظام إحداثيات Three.js
-            const x = (coords[0] / video.videoWidth) * 2 - 1;
-            const y = -(coords[1] / video.videoHeight) * 2 + 1;
-            return new THREE.Vector3(x, y, 0);
-        }
-
-        function captureImage() {
-            // التقاط الصورة من الـ Renderer وحفظها
-            const outputCanvas = document.getElementById('outputCanvas');
-            const ctx = outputCanvas.getContext('2d');
-            outputCanvas.width = renderer.domElement.width;
-            outputCanvas.height = renderer.domElement.height;
-
-            // رسم المشهد على الـ Canvas
-            ctx.drawImage(renderer.domElement, 0, 0);
-
-            // تحويل الـ Canvas إلى صورة وحفظها
-            outputCanvas.toBlob(function(blob) {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'صورة.png';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+            sceneEl.addEventListener('targetFound', event => {
+                console.log('وجه تم اكتشافه');
+                leftEye.setAttribute('visible', 'true');
+                rightEye.setAttribute('visible', 'true');
             });
-        }
 
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        init();
+            sceneEl.addEventListener('targetLost', event => {
+                console.log('وجه تم فقدانه');
+                leftEye.setAttribute('visible', 'false');
+                rightEye.setAttribute('visible', 'false');
+            });
+        });
     </script>
 </body>
 </html>
