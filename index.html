@@ -21,6 +21,8 @@
     <!-- إضافة عناصر HTML ضرورية -->
     <video id="video" autoplay playsinline></video>
     <button id="captureBtn">التقاط صورة</button>
+    <canvas id="outputCanvas"></canvas>
+    
     <script src="https://cdn.jsdelivr.net/npm/three@0.153/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.153/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.153/examples/jsm/webxr/VRButton.js"></script>
@@ -44,7 +46,7 @@
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
             camera.position.z = 1;
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
@@ -116,8 +118,17 @@
         }
 
         function captureImage() {
-            // التقاط الصورة من الـ Renderer
-            renderer.domElement.toBlob(function(blob) {
+            // التقاط الصورة من الـ Renderer وحفظها
+            const outputCanvas = document.getElementById('outputCanvas');
+            const ctx = outputCanvas.getContext('2d');
+            outputCanvas.width = renderer.domElement.width;
+            outputCanvas.height = renderer.domElement.height;
+
+            // رسم المشهد على الـ Canvas
+            ctx.drawImage(renderer.domElement, 0, 0);
+
+            // تحويل الـ Canvas إلى صورة وحفظها
+            outputCanvas.toBlob(function(blob) {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
