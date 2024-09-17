@@ -3,85 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebXR Eye Color Change</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+    <title>WebXR Eye Color Changer</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-face-aframe.prod.js"></script>
 </head>
 <body>
-    <button id="startAR">Start AR</button>
+    <a-scene mindar-face embedded color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+        <a-camera active="false" position="0 0 0"></a-camera>
+        
+        <a-entity mindar-face-target="anchorIndex: 168">
+            <a-sphere id="leftEye" color="#00ff00" opacity="0.5" radius="0.018" position="-0.035 0.033 -0.05"></a-sphere>
+        </a-entity>
+        
+        <a-entity mindar-face-target="anchorIndex: 168">
+            <a-sphere id="rightEye" color="#00ff00" opacity="0.5" radius="0.018" position="0.035 0.033 -0.05"></a-sphere>
+        </a-entity>
+    </a-scene>
+
+    <button id="captureButton" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; padding: 10px 20px;">
+        Capture Image
+    </button>
 
     <script>
-        let camera, scene, renderer, loader;
-        let eyeLeftMesh, eyeRightMesh;
-
-        function init() {
-            scene = new THREE.Scene();
-
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true;
-            document.body.appendChild(renderer.domElement);
-
-            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-            scene.add(light);
-
-            loader = new THREE.GLTFLoader();
-
-            // Load eye model (you need to provide the correct path to your 3D eye model)
-            loader.load('path/to/eye_model.gltf', (gltf) => {
-                eyeLeftMesh = gltf.scene.children[0];
-                eyeRightMesh = gltf.scene.children[1];
-                scene.add(eyeLeftMesh);
-                scene.add(eyeRightMesh);
-            });
-
-            window.addEventListener('resize', onWindowResize, false);
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function changeEyeColorToGreen() {
-            const greenMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
-            if (eyeLeftMesh) eyeLeftMesh.material = greenMaterial;
-            if (eyeRightMesh) eyeRightMesh.material = greenMaterial;
-        }
-
-        function animate() {
-            renderer.setAnimationLoop(render);
-        }
-
-        function render() {
-            renderer.render(scene, camera);
-        }
-
-        document.getElementById('startAR').addEventListener('click', () => {
-            if ('xr' in navigator) {
-                navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-                    if (supported) {
-                        navigator.xr.requestSession('immersive-ar', {
-                            requiredFeatures: ['hit-test']
-                        }).then((session) => {
-                            renderer.xr.setSession(session);
-                            changeEyeColorToGreen();
-                            animate();
-                        });
-                    } else {
-                        console.error('AR not supported on this device');
-                    }
-                });
-            } else {
-                console.error('WebXR not supported in this browser');
-            }
+        document.addEventListener('DOMContentLoaded', function() {
+            const captureButton = document.getElementById('captureButton');
+            captureButton.addEventListener('click', captureImage);
         });
 
-        init();
+        function captureImage() {
+            const scene = document.querySelector('a-scene');
+            const img = scene.components.screenshot.getCanvas('perspective');
+            
+            // Convert canvas to blob
+            img.toBlob(function(blob) {
+                // Create a temporary URL for the blob
+                const url = URL.createObjectURL(blob);
+                
+                // Create a temporary anchor element
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'green_eyes_selfie.png';
+                
+                // Append to the document and trigger the download
+                document.body.appendChild(a);
+                a.click();
+                
+                // Clean up
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            });
+        }
     </script>
 </body>
 </html>
+
 
