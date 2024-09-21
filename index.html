@@ -10,17 +10,14 @@
 </head>
 <body>
   <button id="enter-ar">Enter AR</button>
-  
+
   <!-- Include Three.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <!-- Include VRButton for WebXR -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/VRButton.js"></script>
-  
-  <!-- Include MediaPipe Face Mesh -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
-  
-  <script>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.128.0/build/three.module.js';
+    import { ARButton } from './scripts/ARButton.js';
+    import { FaceMesh } from 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
+    import { drawConnectors, drawLandmarks } from 'https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js';
+
     // Select the Enter AR button
     const enterARButton = document.getElementById('enter-ar');
 
@@ -32,6 +29,8 @@
         } else {
           alert('WebXR AR not supported by your browser.');
         }
+      }).catch((err) => {
+        console.error('Error checking XR session support:', err);
       });
     } else {
       alert('WebXR not supported by your browser.');
@@ -48,7 +47,9 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.xr.enabled = true;
       document.body.appendChild(renderer.domElement);
-      document.body.appendChild(VRButton.createButton(renderer, { requiredFeatures: ['local', 'bounded'] }));
+
+      // Add AR button
+      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['local', 'bounded'] }));
 
       // Add ambient light
       const light = new THREE.HemisphereLight(0xffffff, 0x444444);
@@ -88,6 +89,9 @@
       navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
         video.srcObject = stream;
         video.play();
+      }).catch((err) => {
+        console.error('Error accessing webcam:', err);
+        alert('Cannot access webcam. Please allow camera permissions.');
       });
 
       video.onloadeddata = () => {
@@ -98,12 +102,11 @@
         if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
           const landmarks = results.multiFaceLandmarks[0];
           
-          // Get eye landmarks (using MediaPipe's landmark indices)
-          // Left Eye: landmarks 33 (left corner) to 133 (right corner)
-          // Right Eye: landmarks 362 (left corner) to 263 (right corner)
+          // Define landmark indices for eyes
+          const leftEyeIndices = [33, 133, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7];
+          const rightEyeIndices = [362, 263, 387, 386, 385, 384, 398, 362, 382, 381, 380, 374, 373, 390, 249];
           
           // Calculate average position for left eye
-          const leftEyeIndices = [33, 133, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7];
           let leftX = 0, leftY = 0, leftZ = 0;
           leftEyeIndices.forEach(index => {
             leftX += landmarks[index].x;
@@ -116,7 +119,6 @@
           leftEye.position.set(leftX - 0.5, -leftY + 0.5, -leftZ); // Adjust scaling and positioning
 
           // Calculate average position for right eye
-          const rightEyeIndices = [362, 263, 387, 386, 385, 384, 398, 362, 382, 381, 380, 374, 373, 390, 249];
           let rightX = 0, rightY = 0, rightZ = 0;
           rightEyeIndices.forEach(index => {
             rightX += landmarks[index].x;
@@ -136,7 +138,7 @@
       }
 
       // Start AR session
-      renderer.xr.setAnimationLoop(() => {
+      renderer.setAnimationLoop(() => {
         renderer.render(scene, camera);
       });
     }
