@@ -1,147 +1,309 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar">
 <head>
-  <meta charset="UTF-8">
-  <title>WebXR AR - Red Eyes Effect</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    #enter-ar { position: absolute; top: 20px; left: 20px; z-index: 1; padding: 10px 20px; background: #fff; border: none; cursor: pointer; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تأثير WebXR للمكياج الافتراضي</title>
+    <style>
+        /* styles.css */
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        #video-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #video {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* عكس الفيديو لجعل التجربة كمرآة */
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            transform: scaleX(-1); /* عكس اللوحة لتتوافق مع الفيديو */
+        }
+    </style>
+    <!-- تحميل مكتبة three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- تحميل مكتبة MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+    <!-- تحميل مكتبة TensorFlow.js (اختياري إذا كنت تستخدم TensorFlow) -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
 </head>
 <body>
-  <button id="enter-ar">Enter AR</button>
+    <div id="video-container">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="overlay"></canvas>
+    </div>
+    <script>
+        // faceTracking.js
 
-  <!-- Include Three.js -->
-  <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.128.0/build/three.module.js';
-    import { ARButton } from './scripts/ARButton.js';
-    import { FaceMesh } from 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
-    import { drawConnectors, drawLandmarks } from 'https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js';
+        class FaceTracker {
+            constructor(onFaceDetected) {
+                this.onFaceDetected = onFaceDetected;
+                this.video = document.getElementById('video');
+                this.overlay = document.getElementById('overlay');
+                this.canvasCtx = this.overlay.getContext('2d');
 
-    // Select the Enter AR button
-    const enterARButton = document.getElementById('enter-ar');
+                this.faceMesh = new FaceMesh.FaceMesh({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+                    }
+                });
 
-    // Check for WebXR support
-    if (navigator.xr) {
-      navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-        if (supported) {
-          enterARButton.addEventListener('click', initAR);
-        } else {
-          alert('WebXR AR not supported by your browser.');
-        }
-      }).catch((err) => {
-        console.error('Error checking XR session support:', err);
-      });
-    } else {
-      alert('WebXR not supported by your browser.');
-    }
+                this.faceMesh.setOptions({
+                    maxNumFaces: 1,
+                    refineLandmarks: true,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
 
-    function initAR() {
-      // Hide the Enter AR button
-      enterARButton.style.display = 'none';
+                this.faceMesh.onResults(this.onResults.bind(this));
+            }
 
-      // Set up the Three.js scene
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      document.body.appendChild(renderer.domElement);
+            async initCamera() {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user' },
+                    audio: false
+                });
+                this.video.srcObject = stream;
+                return new Promise((resolve) => {
+                    this.video.onloadedmetadata = () => {
+                        this.video.play();
+                        resolve();
+                    };
+                });
+            }
 
-      // Add AR button
-      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['local', 'bounded'] }));
+            async start() {
+                await this.initCamera();
+                this.sendFrame();
+            }
 
-      // Add ambient light
-      const light = new THREE.HemisphereLight(0xffffff, 0x444444);
-      light.position.set(0, 20, 0);
-      scene.add(light);
+            sendFrame() {
+                this.faceMesh.send({ image: this.video });
+                requestAnimationFrame(this.sendFrame.bind(this));
+            }
 
-      // Create red eye overlays
-      const eyeGeometry = new THREE.SphereGeometry(0.02, 32, 32);
-      const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Red color
+            onResults(results) {
+                this.canvasCtx.save();
+                this.canvasCtx.clearRect(0, 0, this.overlay.width, this.overlay.height);
+                this.canvasCtx.drawImage(
+                    results.image, 0, 0, this.overlay.width, this.overlay.height
+                );
 
-      const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-      const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-      scene.add(leftEye);
-      scene.add(rightEye);
+                if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                    const landmarks = results.multiFaceLandmarks[0];
+                    this.onFaceDetected(landmarks);
+                }
 
-      // Initialize MediaPipe Face Mesh
-      const video = document.createElement('video');
-      video.style.display = 'none';
-      document.body.appendChild(video);
-
-      const faceMesh = new FaceMesh.FaceMesh({
-        locateFile: (file) => {
-          return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
-        }
-      });
-
-      faceMesh.setOptions({
-        maxNumFaces: 1,
-        refineLandmarks: true,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
-      });
-
-      faceMesh.onResults(onResults);
-
-      // Access the webcam
-      navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-        video.srcObject = stream;
-        video.play();
-      }).catch((err) => {
-        console.error('Error accessing webcam:', err);
-        alert('Cannot access webcam. Please allow camera permissions.');
-      });
-
-      video.onloadeddata = () => {
-        faceMesh.send({ image: video });
-      };
-
-      function onResults(results) {
-        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-          const landmarks = results.multiFaceLandmarks[0];
-          
-          // Define landmark indices for eyes
-          const leftEyeIndices = [33, 133, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7];
-          const rightEyeIndices = [362, 263, 387, 386, 385, 384, 398, 362, 382, 381, 380, 374, 373, 390, 249];
-          
-          // Calculate average position for left eye
-          let leftX = 0, leftY = 0, leftZ = 0;
-          leftEyeIndices.forEach(index => {
-            leftX += landmarks[index].x;
-            leftY += landmarks[index].y;
-            leftZ += landmarks[index].z;
-          });
-          leftX /= leftEyeIndices.length;
-          leftY /= leftEyeIndices.length;
-          leftZ /= leftEyeIndices.length;
-          leftEye.position.set(leftX - 0.5, -leftY + 0.5, -leftZ); // Adjust scaling and positioning
-
-          // Calculate average position for right eye
-          let rightX = 0, rightY = 0, rightZ = 0;
-          rightEyeIndices.forEach(index => {
-            rightX += landmarks[index].x;
-            rightY += landmarks[index].y;
-            rightZ += landmarks[index].z;
-          });
-          rightX /= rightEyeIndices.length;
-          rightY /= rightEyeIndices.length;
-          rightZ /= rightEyeIndices.length;
-          rightEye.position.set(rightX - 0.5, -rightY + 0.5, -rightZ); // Adjust scaling and positioning
+                this.canvasCtx.restore();
+            }
         }
 
-        // Continue processing frames
-        if (renderer.xr.isPresenting) {
-          faceMesh.send({ image: video });
-        }
-      }
+        // makeupOverlay.js
 
-      // Start AR session
-      renderer.setAnimationLoop(() => {
-        renderer.render(scene, camera);
-      });
-    }
-  </script>
+        class MakeupOverlay {
+            constructor() {
+                this.overlay = document.getElementById('overlay');
+                this.canvas = document.createElement('canvas');
+                this.canvas.width = this.overlay.width;
+                this.canvas.height = this.overlay.height;
+                this.canvasCtx = this.canvas.getContext('2d');
+            }
+
+            applyMakeup(landmarks) {
+                this.canvasCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // تطبيق أحمر الشفاه
+                this.drawLipstick(landmarks);
+
+                // تطبيق كحل العيون
+                this.drawEyeliner(landmarks);
+
+                // تطبيق أحمر الخدود
+                this.drawBlush(landmarks);
+
+                // دمج طبقة المكياج مع اللوحة الرئيسية
+                this.overlay.getContext('2d').drawImage(this.canvas, 0, 0);
+            }
+
+            drawLipstick(landmarks) {
+                // تحديد نقاط الشفاه
+                const lipUpper = landmarks.slice(61, 80);
+                const lipLower = landmarks.slice(81, 100);
+
+                this.canvasCtx.fillStyle = 'rgba(255, 0, 0, 0.6)'; // أحمر شفاف
+
+                this.canvasCtx.beginPath();
+                lipUpper.forEach((point, index) => {
+                    const x = point.x * this.canvas.width;
+                    const y = point.y * this.canvas.height;
+                    if (index === 0) this.canvasCtx.moveTo(x, y);
+                    else this.canvasCtx.lineTo(x, y);
+                });
+
+                lipLower.forEach((point, index) => {
+                    const x = point.x * this.canvas.width;
+                    const y = point.y * this.canvas.height;
+                    this.canvasCtx.lineTo(x, y);
+                });
+
+                this.canvasCtx.closePath();
+                this.canvasCtx.fill();
+            }
+
+            drawEyeliner(landmarks) {
+                // تحديد نقاط العيون (هذه نقاط تقريبية وقد تحتاج لتعديل بناءً على مكتبة المعالم)
+                const leftEye = landmarks.slice(33, 133); // نقاط العين اليسرى
+                const rightEye = landmarks.slice(263, 362); // نقاط العين اليمنى
+
+                this.canvasCtx.strokeStyle = 'rgba(0, 0, 0, 0.8)'; // أسود شفاف
+                this.canvasCtx.lineWidth = 2;
+
+                this.drawEye(leftEye);
+                this.drawEye(rightEye);
+            }
+
+            drawEye(eyeLandmarks) {
+                this.canvasCtx.beginPath();
+                eyeLandmarks.forEach((point, index) => {
+                    const x = point.x * this.canvas.width;
+                    const y = point.y * this.canvas.height;
+                    if (index === 0) this.canvasCtx.moveTo(x, y);
+                    else this.canvasCtx.lineTo(x, y);
+                });
+                this.canvasCtx.stroke();
+            }
+
+            drawBlush(landmarks) {
+                // تحديد نقاط الخدود (هذه نقاط تقريبية وقد تحتاج لتعديل بناءً على مكتبة المعالم)
+                const leftCheek = landmarks[234];
+                const rightCheek = landmarks[454];
+
+                this.canvasCtx.fillStyle = 'rgba(255, 105, 180, 0.5)'; // وردي شفاف
+
+                // رسم دائرة بسيطة على الخدود
+                this.canvasCtx.beginPath();
+                this.canvasCtx.arc(leftCheek.x * this.canvas.width, leftCheek.y * this.canvas.height, 20, 0, 2 * Math.PI);
+                this.canvasCtx.fill();
+
+                this.canvasCtx.beginPath();
+                this.canvasCtx.arc(rightCheek.x * this.canvas.width, rightCheek.y * this.canvas.height, 20, 0, 2 * Math.PI);
+                this.canvasCtx.fill();
+            }
+        }
+
+        // animation.js
+
+        class LineAnimation {
+            constructor() {
+                this.overlay = document.getElementById('overlay');
+                this.canvas = document.createElement('canvas');
+                this.canvas.width = this.overlay.width;
+                this.canvas.height = this.overlay.height;
+                this.canvasCtx = this.canvas.getContext('2d');
+                this.isAnimating = false;
+                this.startTime = null;
+            }
+
+            start() {
+                if (this.isAnimating) return;
+                this.isAnimating = true;
+                this.startTime = performance.now();
+                requestAnimationFrame(this.animate.bind(this));
+            }
+
+            animate(timestamp) {
+                if (!this.isAnimating) return;
+                const elapsed = timestamp - this.startTime;
+                if (elapsed > 2000) { // انتهاء بعد ثانيتين
+                    this.isAnimating = false;
+                    this.clear();
+                    return;
+                }
+
+                const progress = (elapsed % 1000) / 1000; // دورة كل ثانية
+
+                // حساب موضع الخط
+                const y = this.canvas.height / 2 + 50 * Math.sin(progress * 2 * Math.PI);
+
+                // رسم الخط
+                this.canvasCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                this.canvasCtx.lineWidth = 2;
+                this.canvasCtx.beginPath();
+                this.canvasCtx.moveTo(0, y);
+                this.canvasCtx.lineTo(this.canvas.width, y);
+                this.canvasCtx.stroke();
+
+                // دمج الخط مع اللوحة الرئيسية
+                this.overlay.getContext('2d').drawImage(this.canvas, 0, 0);
+
+                requestAnimationFrame(this.animate.bind(this));
+            }
+
+            clear() {
+                this.canvasCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.overlay.getContext('2d').clearRect(0, 0, this.overlay.width, this.overlay.height);
+            }
+        }
+
+        // main.js
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const faceTracker = new FaceTracker(onFaceDetected);
+            const makeupOverlay = new MakeupOverlay();
+            const lineAnimation = new LineAnimation();
+
+            faceTracker.start();
+
+            function onFaceDetected(landmarks) {
+                makeupOverlay.applyMakeup(landmarks);
+                // بدء حركة الخط بعد التقاط الوجه
+                lineAnimation.start();
+            }
+
+            // تحديث حجم اللوحات عند تغيير حجم النافذة
+            window.addEventListener('resize', () => {
+                const overlay = document.getElementById('overlay');
+                overlay.width = window.innerWidth;
+                overlay.height = window.innerHeight;
+
+                // تحديث حجم اللوحات في MakeupOverlay و LineAnimation
+                makeupOverlay.canvas.width = window.innerWidth;
+                makeupOverlay.canvas.height = window.innerHeight;
+
+                lineAnimation.canvas.width = window.innerWidth;
+                lineAnimation.canvas.height = window.innerHeight;
+            });
+
+            // ضبط حجم اللوحات عند التحميل
+            const overlay = document.getElementById('overlay');
+            overlay.width = window.innerWidth;
+            overlay.height = window.innerHeight;
+
+            // ضبط حجم اللوحات في MakeupOverlay و LineAnimation
+            makeupOverlay.canvas.width = window.innerWidth;
+            makeupOverlay.canvas.height = window.innerHeight;
+
+            lineAnimation.canvas.width = window.innerWidth;
+            lineAnimation.canvas.height = window.innerHeight;
+        });
+    </script>
 </body>
 </html>
