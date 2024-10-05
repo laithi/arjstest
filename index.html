@@ -1,145 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>WebXR Interactive Cube</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
-    #enter-vr {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      padding: 10px 20px;
-      background: #ff5722;
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-size: 16px;
-      border-radius: 5px;
-      z-index: 1;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>WebXR Interactive Cube</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <button id="enter-vr">Enter VR</button>
-  
-  <!-- Three.js Library -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r150/three.min.js"></script>
-  
-  <!-- WebXR Polyfill (Optional but recommended for broader compatibility) -->
-  <script src="https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.min.js"></script>
-  
-  <script>
-    // Ensure WebXR is supported
-    if (navigator.xr) {
-      navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
-        if (!supported) {
-          document.getElementById('enter-vr').style.display = 'none';
-          alert('WebXR VR not supported by your browser/device.');
-        }
-      });
-    } else {
-      document.getElementById('enter-vr').style.display = 'none';
-      alert('WebXR not available in your browser.');
-    }
+    <button id="enterVR">Enter VR</button>
+    <div id="container"></div>
 
-    // Scene, Camera, Renderer
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x202020);
-
-    const camera = new THREE.PerspectiveCamera(
-      70, window.innerWidth / window.innerHeight, 0.1, 1000
-    );
-    camera.position.set(0, 1.6, 3); // Typical eye height in meters
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.xr.enabled = true; // Enable WebXR
-    document.body.appendChild(renderer.domElement);
-
-    // Handle window resize
-    window.addEventListener('resize', () => {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-    });
-
-    // Add a Spinning Cube
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    let cubeColor = 0x00ff00;
-    const material = new THREE.MeshStandardMaterial({ color: cubeColor });
-    const cube = new THREE.Mesh(geometry, material);
-    scene.add(cube);
-
-    // Add Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(5, 10, 7.5);
-    scene.add(directionalLight);
-
-    // Optional: Add ground for better visualization
-    const groundGeometry = new THREE.PlaneGeometry(10, 10);
-    const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x808080, depthWrite: false });
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = 0;
-    scene.add(ground);
-
-    // Raycaster for Interaction
-    const raycaster = new THREE.Raycaster();
-    const gazeDuration = 2000; // 2 seconds in milliseconds
-    let gazeStart = null;
-    let isGazing = false;
-
-    // Animation Loop
-    function animate(time) {
-      renderer.setAnimationLoop(render);
-    }
-
-    function render(time) {
-      // Rotate the cube
-      cube.rotation.x += 0.005;
-      cube.rotation.y += 0.005;
-
-      // Raycasting from the camera's center
-      raycaster.setFromCamera({ x: 0, y: 0 }, camera);
-      const intersects = raycaster.intersectObject(cube);
-
-      if (intersects.length > 0) {
-        if (!gazeStart) {
-          gazeStart = time;
-        } else {
-          if (time - gazeStart > gazeDuration && !isGazing) {
-            // Change cube color randomly
-            cube.material.color.setHex(Math.random() * 0xffffff);
-            isGazing = true;
-          }
-        }
-      } else {
-        gazeStart = null;
-        isGazing = false;
-      }
-
-      renderer.render(scene, camera);
-    }
-
-    animate();
-
-    // VR Button Functionality
-    const vrButton = document.getElementById('enter-vr');
-
-    vrButton.addEventListener('click', () => {
-      if (renderer.xr.isPresenting) {
-        renderer.xr.exitPresent();
-      } else {
-        renderer.xr.requestSession('immersive-vr').catch((err) => {
-          console.error('Failed to enter VR:', err);
-        });
-      }
-    });
-  </script>
+    <!-- Include Three.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r136/three.min.js"></script>
+    <!-- Include main JavaScript file -->
+    <script src="main.js"></script>
 </body>
 </html>
