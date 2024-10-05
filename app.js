@@ -30,7 +30,7 @@ function initThreeJS() {
     scene.add(ambientLight);
 
     // Load initial glasses model
-    loadGlasses('style1.glb');
+    loadGlasses('untitled.glb');
 
     animate();
 }
