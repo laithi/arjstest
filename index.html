@@ -2,17 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WebXR Interactive Cube</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Virtual Glasses Try-On</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div id="container"></div>
+    <h1>Virtual Glasses Try-On</h1>
+    <div id="video-container">
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="overlay"></canvas>
+    </div>
+    <div id="glasses-selector">
+        <button onclick="changeGlasses('style1.glb')">Style 1</button>
+        <button onclick="changeGlasses('style2.glb')">Style 2</button>
+        <button onclick="changeGlasses('style3.glb')">Style 3</button>
+    </div>
 
-    <!-- Include Three.js library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r136/three.min.js"></script>
-    <!-- Include VRButton -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r136/examples/jsm/webxr/VRButton.js"></script>
-    <!-- Include main JavaScript file -->
-    <script src="main.js"></script>
+    <!-- Three.js and face-api.js libraries -->
+    <script src="libs/three.min.js"></script>
+    <script src="libs/GLTFLoader.js"></script>
+    <script src="libs/face-api.min.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
