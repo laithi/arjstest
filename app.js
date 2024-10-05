@@ -19,37 +19,47 @@ const makeupImages = {
     blush: new Image()
 };
 
-// Set source for makeup images (ensure these images have transparent backgrounds)
-makeupImages.lipstick.src = 'https://i.postimg.cc/3x0PXYRk/lipstick.png'; // Example URL
-makeupImages.eyeshadow.src = 'https://i.postimg.cc/3N0D6yPc/eyeshadow.png'; // Example URL
-makeupImages.blush.src = 'https://i.postimg.cc/CK3rJ4bH/blush.png'; // Example URL
+// Set source for makeup images (hosted locally recommended)
+makeupImages.lipstick.src = 'assets/lipstick.png'; // Ensure correct path
+makeupImages.eyeshadow.src = 'assets/eyeshadow.png';
+makeupImages.blush.src = 'assets/blush.png';
 
 // Handle makeup selection
 lipstickBtn.addEventListener('click', () => { currentMakeup = 'lipstick'; });
 eyeshadowBtn.addEventListener('click', () => { currentMakeup = 'eyeshadow'; });
 blushBtn.addEventListener('click', () => { currentMakeup = 'blush'; });
-clearBtn.addEventListener('click', () => { currentMakeup = null; ctx.clearRect(0, 0, overlay.width, overlay.height); });
+clearBtn.addEventListener('click', () => { 
+    currentMakeup = null; 
+    ctx.clearRect(0, 0, overlay.width, overlay.height); 
+});
 
 // Start video stream
 async function startVideo() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
     } catch (err) {
         console.error("Error accessing webcam: ", err);
+        alert("Unable to access the webcam. Please check permissions and try again.");
     }
 }
 
 // Load face-api models
 async function loadModels() {
     const MODEL_URL = '/models';
-    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-    await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL);
+    try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL);
+        console.log("Face-api models loaded successfully");
+    } catch (err) {
+        console.error("Error loading face-api models: ", err);
+        alert("Failed to load face detection models.");
+    }
 }
 
 // Detect face and apply makeup
 async function onPlay() {
-    const options = new faceapi.TinyFaceDetectorOptions();
+    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
     const result = await faceapi.detectSingleFace(video, options).withFaceLandmarks(true);
 
     ctx.clearRect(0, 0, overlay.width, overlay.height);
@@ -78,13 +88,11 @@ async function onPlay() {
 // Apply Lipstick
 function applyLipstick(landmarks) {
     const lips = landmarks.getLips();
-    const topLip = lips.slice(0, 22);
-    const bottomLip = lips.slice(22, 42);
+    const lipPositions = lips.map(point => [point.x, point.y]);
 
     // Calculate bounding box for lips
-    const lipPoints = lips.map(point => [point.x, point.y]);
-    const xs = lipPoints.map(p => p[0]);
-    const ys = lipPoints.map(p => p[1]);
+    const xs = lipPositions.map(p => p[0]);
+    const ys = lipPositions.map(p => p[1]);
     const minX = Math.min(...xs);
     const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
@@ -93,8 +101,15 @@ function applyLipstick(landmarks) {
     const width = maxX - minX;
     const height = maxY - minY;
 
+    // Adjust size as needed
+    const scaleFactor = 1.2;
+    const adjustedWidth = width * scaleFactor;
+    const adjustedHeight = height * scaleFactor;
+    const adjustedX = minX - (adjustedWidth - width) / 2;
+    const adjustedY = minY - (adjustedHeight - height) / 2;
+
     // Draw lipstick image
-    ctx.drawImage(makeupImages.lipstick, minX, minY, width, height);
+    ctx.drawImage(makeupImages.lipstick, adjustedX, adjustedY, adjustedWidth, adjustedHeight);
 }
 
 // Apply Eyeshadow
@@ -102,11 +117,12 @@ function applyEyeshadow(landmarks) {
     const leftEye = landmarks.getLeftEye();
     const rightEye = landmarks.getRightEye();
 
-    // Calculate bounding boxes for eyes
     [leftEye, rightEye].forEach(eye => {
-        const eyePoints = eye.map(point => [point.x, point.y]);
-        const xs = eyePoints.map(p => p[0]);
-        const ys = eyePoints.map(p => p[1]);
+        const eyePositions = eye.map(point => [point.x, point.y]);
+
+        // Calculate bounding box for eye
+        const xs = eyePositions.map(p => p[0]);
+        const ys = eyePositions.map(p => p[1]);
         const minX = Math.min(...xs) - 20;
         const maxX = Math.max(...xs) + 20;
         const minY = Math.min(...ys) - 20;
@@ -123,8 +139,8 @@ function applyEyeshadow(landmarks) {
 // Apply Blush
 function applyBlush(landmarks) {
     const nose = landmarks.getNose();
-    const leftCheek = landmarks.getNose()[3]; // Approximate left cheek
-    const rightCheek = landmarks.getNose()[5]; // Approximate right cheek
+    const leftCheek = nose[3]; // Approximate left cheek
+    const rightCheek = nose[5]; // Approximate right cheek
 
     const blushSize = 50;
 
@@ -148,9 +164,12 @@ async function init() {
     await loadModels();
     await startVideo();
 
-    video.addEventListener('play', () => {
+    video.addEventListener('loadedmetadata', () => {
         overlay.width = video.videoWidth;
         overlay.height = video.videoHeight;
+    });
+
+    video.addEventListener('play', () => {
         onPlay();
     });
 }
