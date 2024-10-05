@@ -2,25 +2,27 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Virtual Glasses Try-On</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebAR Makeup Try-On</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>Virtual Glasses Try-On</h1>
+    <h1>WebAR Virtual Makeup Try-On</h1>
     <div id="video-container">
-        <video id="video" autoplay muted playsinline></video>
+        <video id="video" autoplay muted></video>
         <canvas id="overlay"></canvas>
     </div>
-    <div id="glasses-selector">
-        <button onclick="changeGlasses('https://github.com/laithi/arjstest/blob/main/untitled.glb')">Style 1</button>
-        <button onclick="changeGlasses('https://github.com/laithi/arjstest/blob/main/untitled.glb')">Style 2</button>
-        <button onclick="changeGlasses('https://github.com/laithi/arjstest/blob/main/untitled.glb')">Style 3</button>
+    <div id="makeup-controls">
+        <button id="lipstick-btn">Lipstick</button>
+        <button id="eyeshadow-btn">Eyeshadow</button>
+        <button id="blush-btn">Blush</button>
+        <button id="clear-btn">Clear Makeup</button>
     </div>
 
-    <!-- Three.js and face-api.js libraries -->
-    <script src="libs/three.min.js"></script>
-    <script src="libs/GLTFLoader.js"></script>
-    <script src="libs/face-api.min.js"></script>
-    <script src="app.js"></script>
+    <!-- face-api.js library -->
+    <script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <!-- App JavaScript -->
+    <script defer src="app.js"></script>
 </body>
 </html>
