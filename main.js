@@ -1,3 +1,10 @@
+// Check if WebXR is supported
+if (navigator.xr) {
+    console.log("WebXR is supported");
+} else {
+    alert("WebXR is not supported by your browser.");
+}
+
 // Initialize scene, camera, and renderer
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x202020);
@@ -11,6 +18,9 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 document.getElementById('container').appendChild(renderer.domElement);
+
+// Add VR button
+document.body.appendChild(VRButton.createButton(renderer));
 
 // Add a simple cube
 const geometry = new THREE.BoxGeometry();
@@ -30,16 +40,6 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
 }, false);
 
-// Enter VR on button click
-document.getElementById('enterVR').addEventListener('click', () => {
-    renderer.xr.enabled = true;
-    navigator.xr.requestSession('immersive-vr').then(session => {
-        renderer.xr.setSession(session);
-    }).catch(err => {
-        alert('VR not supported: ' + err);
-    });
-});
-
 // Rotate the cube
 function animate() {
     renderer.setAnimationLoop(render);
@@ -55,5 +55,7 @@ animate();
 
 // Handle click to change cube color
 window.addEventListener('click', () => {
-    cube.material.color.setHex(Math.random() * 0xffffff);
+    const newColor = Math.random() * 0xffffff;
+    cube.material.color.setHex(newColor);
+    console.log(`Cube color changed to: #${newColor.toString(16).padStart(6, '0')}`);
 });
