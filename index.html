@@ -11,7 +11,7 @@
 
       let scene, camera, renderer;
       let model = null;
-      
+
       // Initialize the Three.js scene
       function init() {
         scene = new THREE.Scene();
@@ -22,9 +22,6 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.xr.enabled = true; // Enable WebXR
         document.body.appendChild(renderer.domElement);
-
-        // Add the VR button to the page
-        document.body.appendChild(VRButton.createButton(renderer));
 
         // Load the "future museum" GLTF model
         const loader = new GLTFLoader();
@@ -47,6 +44,19 @@
 
         // Handle window resizing
         window.addEventListener('resize', onWindowResize, false);
+
+        // Attempt to enter VR automatically
+        try {
+          renderer.xr.setSessionInit({ optionalFeatures: ['local-floor', 'bounded-floor'] });
+          renderer.xr.getController(0); // Initialize controllers if needed
+          navigator.xr.requestSession('immersive-vr').then((session) => {
+            renderer.xr.setSession(session);
+          }).catch((error) => {
+            console.warn('Unable to start XR session:', error);
+          });
+        } catch (e) {
+          console.warn('WebXR not supported or failed:', e);
+        }
       }
 
       // Update camera aspect and renderer size when window resizes
@@ -73,7 +83,7 @@
   </head>
   <body>
     <main style='text-align: center;'>
-      <p>Click 'Enter VR' to start the immersive experience</p> 
+      <p>If the VR session does not start automatically, please check browser security settings.</p> 
     </main>
   </body>
 </html>
