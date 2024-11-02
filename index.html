@@ -16,10 +16,14 @@
       function init() {
         scene = new THREE.Scene();
         camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.6, 3); // Position the camera
+
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.xr.enabled = true;
+        renderer.xr.enabled = true; // Enable WebXR
         document.body.appendChild(renderer.domElement);
+
+        // Add the VR button to the page
         document.body.appendChild(VRButton.createButton(renderer));
 
         // Load the "future museum" GLTF model
