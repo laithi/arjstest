@@ -3,9 +3,9 @@
 <head>
     <title>WebAR 3D Model Viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ar.js/2.2.2/aframe-ar.js"></script>
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <!-- Update to latest versions of libraries -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
         body {
             margin: 0;
@@ -32,26 +32,34 @@
             padding: 10px;
             border-radius: 5px;
             z-index: 100;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    <div id="instructions" class="ar-overlay">Point your camera at a flat surface</div>
-    <button id="placeButton">Place 3D Model</button>
-    
-    <a-scene
-        vr-mode-ui="enabled: false"
+    <div id="instructions" class="ar-overlay">Waiting for camera permission...</div>
+    <button id="placeButton" style="display: none;">Place 3D Model</button>
+
+    <!-- Modified A-Frame scene setup -->
+    <a-scene 
         embedded
-        arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
-        
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        renderer="logarithmicDepthBuffer: true;"
+        vr-mode-ui="enabled: false">
+
+        <!-- Define assets -->
+        <a-assets>
+            <a-asset-item id="model" src="https://github.com/laithi/arjstest/blob/main/future%20museum.gltf"></a-asset-item>
+        </a-assets>
+
         <!-- Camera -->
-        <a-entity camera position="0 1.6 0"></a-entity>
-        
+        <a-entity camera></a-entity>
+
         <!-- 3D Model -->
-        <a-entity
-            id="model"
-            gltf-model="https://github.com/laithi/arjstest/blob/main/future%20museum.gltf"
-            position="0 0 -5"
+        <a-entity 
+            id="ar-model"
+            gltf-model="#model"
+            position="0 0 0"
             scale="0.1 0.1 0.1"
             rotation="0 0 0"
             visible="false">
@@ -59,70 +67,87 @@
     </a-scene>
 
     <script>
-        window.addEventListener('load', function () {
-            const model = document.getElementById('model');
+        window.onload = function() {
+            const model = document.getElementById('ar-model');
             const placeButton = document.getElementById('placeButton');
             const instructions = document.getElementById('instructions');
             let isPlaced = false;
 
-            // Handle surface detection
+            // Check for WebXR support
+            if (navigator.xr) {
+                navigator.xr.isSessionSupported('immersive-ar')
+                    .then((supported) => {
+                        if (supported) {
+                            instructions.textContent = 'WebXR AR Supported. Initializing...';
+                        } else {
+                            instructions.textContent = 'WebXR AR not supported on this device';
+                        }
+                    });
+            }
+
+            // Handle camera initialization
             const scene = document.querySelector('a-scene');
-            scene.addEventListener('enter-vr', function() {
-                if (navigator.xr) {
-                    navigator.xr.isSessionSupported('immersive-ar')
-                        .then((supported) => {
-                            if (supported) {
-                                instructions.textContent = 'AR supported! Point at a surface';
-                            } else {
-                                instructions.textContent = 'AR not supported on this device';
-                            }
-                        });
-                }
+            
+            scene.addEventListener('loaded', function () {
+                instructions.textContent = 'Scene loaded. Waiting for camera...';
             });
 
-            // Place model when button is clicked
+            scene.addEventListener('camera-init', function () {
+                instructions.textContent = 'Camera initialized. Please allow camera access.';
+            });
+
+            // When everything is ready
+            scene.addEventListener('arjs-video-loaded', function () {
+                instructions.textContent = 'Point your camera at a flat surface';
+                placeButton.style.display = 'block';
+            });
+
+            // Error handling for camera
+            scene.addEventListener('camera-error', function (error) {
+                console.error('Camera error:', error);
+                instructions.innerHTML = 'Camera error! Please:<br>1. Ensure camera permissions are granted<br>2. Use HTTPS<br>3. Use a modern browser (Chrome/Safari)';
+            });
+
+            // Place button functionality
             placeButton.addEventListener('click', function() {
                 if (!isPlaced) {
                     model.setAttribute('visible', true);
-                    // Get camera position and place model 2 meters in front
-                    const camera = document.querySelector('[camera]');
-                    const position = camera.getAttribute('position');
-                    const rotation = camera.getAttribute('rotation');
                     
-                    // Calculate position in front of camera
-                    const radians = rotation.y * (Math.PI / 180);
-                    const x = position.x - Math.sin(radians) * 2;
-                    const z = position.z - Math.cos(radians) * 2;
+                    // Get camera position
+                    const camera = document.querySelector('[camera]');
+                    const worldPos = new THREE.Vector3();
+                    camera.object3D.getWorldPosition(worldPos);
+                    
+                    // Place model 2 meters in front of camera
+                    const rotation = camera.object3D.rotation;
+                    const distance = 2;
+                    const x = worldPos.x - Math.sin(rotation.y) * distance;
+                    const z = worldPos.z - Math.cos(rotation.y) * distance;
                     
                     model.setAttribute('position', `${x} 0 ${z}`);
+                    model.setAttribute('rotation', '0 ' + (rotation.y * 180 / Math.PI) + ' 0');
+                    
                     isPlaced = true;
                     placeButton.textContent = 'Adjust Model';
-                    instructions.textContent = 'Model placed! You can walk around it';
+                    instructions.textContent = 'Model placed! Walk around to view it';
                 }
             });
 
-            // Handle model interaction
-            model.addEventListener('click', function(evt) {
+            // Add touch/click interaction for the model
+            model.addEventListener('click', function() {
                 if (isPlaced) {
-                    // Add interaction logic here
-                    const scale = model.getAttribute('scale');
-                    model.setAttribute('scale', {
-                        x: scale.x * 1.2,
-                        y: scale.y * 1.2,
-                        z: scale.z * 1.2
-                    });
+                    const currentScale = model.getAttribute('scale');
+                    const newScale = currentScale.x * 1.2;
+                    model.setAttribute('scale', `${newScale} ${newScale} ${newScale}`);
                 }
             });
+        };
 
-            // Error handling
-            scene.addEventListener('camera-error', function() {
-                instructions.textContent = 'Camera permission denied';
-            });
-
-            scene.addEventListener('ar-error', function() {
-                instructions.textContent = 'AR initialization failed';
-            });
-        });
+        // Additional check for HTTPS
+        if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+            document.getElementById('instructions').innerHTML = 
+                'ERROR: This page must be accessed over HTTPS for camera access.<br>Please use HTTPS or localhost.';
+        }
     </script>
 </body>
 </html>
