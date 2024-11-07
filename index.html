@@ -3,9 +3,8 @@
 <head>
     <title>WebAR 3D Model Viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- Update to latest versions of libraries -->
+    <!-- Latest A-Frame -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
         body {
             margin: 0;
@@ -37,24 +36,24 @@
     </style>
 </head>
 <body>
-    <div id="instructions" class="ar-overlay">Waiting for camera permission...</div>
+    <div id="instructions" class="ar-overlay">Initializing AR...</div>
     <button id="placeButton" style="display: none;">Place 3D Model</button>
 
-    <!-- Modified A-Frame scene setup -->
+    <!-- A-Frame Scene with WebXR AR -->
     <a-scene 
         embedded
-        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        xrweb="mode: ar; debugUIEnabled: false;"
         renderer="logarithmicDepthBuffer: true;"
-        vr-mode-ui="enabled: false">
-
+        vr-mode-ui="enabled: false"
+        hit-test>
+        
         <!-- Define assets -->
         <a-assets>
             <a-asset-item id="model" src="https://github.com/laithi/arjstest/blob/main/future%20museum.gltf"></a-asset-item>
         </a-assets>
 
-        <!-- Camera -->
-        <a-entity camera></a-entity>
-
+        <!-- Camera is handled by A-Frame's XR system -->
+        
         <!-- 3D Model -->
         <a-entity 
             id="ar-model"
@@ -73,81 +72,74 @@
             const instructions = document.getElementById('instructions');
             let isPlaced = false;
 
-            // Check for WebXR support
-            if (navigator.xr) {
-                navigator.xr.isSessionSupported('immersive-ar')
-                    .then((supported) => {
-                        if (supported) {
-                            instructions.textContent = 'WebXR AR Supported. Initializing...';
-                        } else {
-                            instructions.textContent = 'WebXR AR not supported on this device';
-                        }
-                    });
+            // Check for HTTPS
+            if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+                instructions.innerHTML = 
+                    'ERROR: This page must be accessed over HTTPS for camera access.<br>Please use HTTPS or localhost.';
+                return;
             }
 
-            // Handle camera initialization
+            // Access the A-Frame scene
             const scene = document.querySelector('a-scene');
-            
-            scene.addEventListener('loaded', function () {
-                instructions.textContent = 'Scene loaded. Waiting for camera...';
+
+            scene.addEventListener('enter-vr', function (evt) {
+                if (scene.is('ar-mode')) {
+                    instructions.textContent = 'Point your device to a flat surface.';
+                    placeButton.style.display = 'block';
+                }
             });
 
-            scene.addEventListener('camera-init', function () {
-                instructions.textContent = 'Camera initialized. Please allow camera access.';
+            scene.addEventListener('exit-vr', function (evt) {
+                instructions.textContent = 'Exiting AR mode.';
+                placeButton.style.display = 'none';
             });
 
-            // When everything is ready
-            scene.addEventListener('arjs-video-loaded', function () {
-                instructions.textContent = 'Point your camera at a flat surface';
-                placeButton.style.display = 'block';
-            });
-
-            // Error handling for camera
-            scene.addEventListener('camera-error', function (error) {
-                console.error('Camera error:', error);
-                instructions.innerHTML = 'Camera error! Please:<br>1. Ensure camera permissions are granted<br>2. Use HTTPS<br>3. Use a modern browser (Chrome/Safari)';
-            });
-
-            // Place button functionality
             placeButton.addEventListener('click', function() {
                 if (!isPlaced) {
                     model.setAttribute('visible', true);
                     
-                    // Get camera position
-                    const camera = document.querySelector('[camera]');
-                    const worldPos = new THREE.Vector3();
-                    camera.object3D.getWorldPosition(worldPos);
-                    
-                    // Place model 2 meters in front of camera
-                    const rotation = camera.object3D.rotation;
-                    const distance = 2;
-                    const x = worldPos.x - Math.sin(rotation.y) * distance;
-                    const z = worldPos.z - Math.cos(rotation.y) * distance;
-                    
-                    model.setAttribute('position', `${x} 0 ${z}`);
-                    model.setAttribute('rotation', '0 ' + (rotation.y * 180 / Math.PI) + ' 0');
-                    
+                    // Place the model 1 meter in front of the camera
+                    const camera = document.querySelector('a-entity[camera]');
+                    const cameraEl = camera.object3D;
+                    const position = new THREE.Vector3();
+                    cameraEl.getWorldPosition(position);
+
+                    const direction = new THREE.Vector3();
+                    cameraEl.getWorldDirection(direction);
+
+                    const newPosition = position.clone().add(direction.multiplyScalar(1));
+
+                    model.setAttribute('position', newPosition);
+                    model.setAttribute('rotation', '0 0 0');
+
                     isPlaced = true;
                     placeButton.textContent = 'Adjust Model';
-                    instructions.textContent = 'Model placed! Walk around to view it';
+                    instructions.textContent = 'Model placed! Walk around to view it.';
                 }
             });
 
-            // Add touch/click interaction for the model
+            // Add click interaction for scaling the model
             model.addEventListener('click', function() {
                 if (isPlaced) {
                     const currentScale = model.getAttribute('scale');
-                    const newScale = currentScale.x * 1.2;
-                    model.setAttribute('scale', `${newScale} ${newScale} ${newScale}`);
+                    const newScale = {
+                        x: currentScale.x * 1.2,
+                        y: currentScale.y * 1.2,
+                        z: currentScale.z * 1.2
+                    };
+                    model.setAttribute('scale', `${newScale.x} ${newScale.y} ${newScale.z}`);
                 }
             });
-        };
 
-        // Additional check for HTTPS
-        if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-            document.getElementById('instructions').innerHTML = 
-                'ERROR: This page must be accessed over HTTPS for camera access.<br>Please use HTTPS or localhost.';
-        }
+            // Update instructions based on AR session status
+            scene.addEventListener('sessionstart', function () {
+                instructions.textContent = 'AR session started. Place your model.';
+            });
+
+            scene.addEventListener('sessionend', function () {
+                instructions.textContent = 'AR session ended.';
+            });
+        };
     </script>
 </body>
 </html>
