@@ -1,145 +1,88 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>WebAR 3D Model Viewer</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- Latest A-Frame -->
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-        }
-        #placeButton {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 10px 20px;
-            background: #fff;
-            border: none;
-            border-radius: 5px;
-            z-index: 100;
-        }
-        .ar-overlay {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 100;
-            text-align: center;
-        }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markerless WebAR 3D Model</title>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/jsm/libs/stats.module.js"></script>
 </head>
-<body>
-    <div id="instructions" class="ar-overlay">Initializing AR...</div>
-    <button id="placeButton" style="display: none;">Place 3D Model</button>
+<body style="margin: 0; overflow: hidden;">
+<script>
+    let scene, camera, renderer, model;
+    let initCameraZ = 2; // Initial distance of the model
+    let isUserInteracting = false, scale = 1;
 
-    <!-- A-Frame Scene with WebXR AR -->
-    <a-scene 
-        embedded
-        xrweb="mode: ar; debugUIEnabled: false;"
-        renderer="logarithmicDepthBuffer: true;"
-        vr-mode-ui="enabled: false"
-        hit-test>
-        
-        <!-- Define assets -->
-        <a-assets>
-            <a-asset-item id="model" src="https://github.com/laithi/arjstest/blob/main/future%20museum.gltf"></a-asset-item>
-        </a-assets>
+    function init() {
+        scene = new THREE.Scene();
 
-        <!-- Camera is handled by A-Frame's XR system -->
-        
-        <!-- 3D Model -->
-        <a-entity 
-            id="ar-model"
-            gltf-model="#model"
-            position="0 0 0"
-            scale="0.1 0.1 0.1"
-            rotation="0 0 0"
-            visible="false">
-        </a-entity>
-    </a-scene>
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = initCameraZ;
 
-    <script>
-        window.onload = function() {
-            const model = document.getElementById('ar-model');
-            const placeButton = document.getElementById('placeButton');
-            const instructions = document.getElementById('instructions');
-            let isPlaced = false;
+        renderer = new THREE.WebGLRenderer({ alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-            // Check for HTTPS
-            if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-                instructions.innerHTML = 
-                    'ERROR: This page must be accessed over HTTPS for camera access.<br>Please use HTTPS or localhost.';
-                return;
+        const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+        light.position.set(0, 20, 0);
+        scene.add(light);
+
+        // Load 3D Model
+        const loader = new THREE.GLTFLoader();
+        loader.load('https://github.com/laithi/arjstest/blob/main/future%20museum.gltf', function(gltf) {
+            model = gltf.scene;
+            model.scale.set(1, 1, 1);
+            scene.add(model);
+        });
+
+        // Add event listeners for touch gestures
+        document.addEventListener('touchstart', onDocumentTouchStart, false);
+        document.addEventListener('touchmove', onDocumentTouchMove, false);
+        document.addEventListener('touchend', onDocumentTouchEnd, false);
+
+        animate();
+    }
+
+    function onDocumentTouchStart(event) {
+        isUserInteracting = true;
+    }
+
+    function onDocumentTouchMove(event) {
+        if (isUserInteracting && model) {
+            // Adjust model scale for zoom gesture (using pinch)
+            if (event.touches.length == 2) {
+                const dist = Math.hypot(
+                    event.touches[0].pageX - event.touches[1].pageX,
+                    event.touches[0].pageY - event.touches[1].pageY
+                );
+                scale = dist / 300; // Adjust scale factor based on touch distance
+                model.scale.set(scale, scale, scale);
             }
+            // Rotate model with single touch drag
+            else if (event.touches.length == 1) {
+                model.rotation.y += event.touches[0].movementX * 0.005;
+                model.rotation.x += event.touches[0].movementY * 0.005;
+            }
+        }
+    }
 
-            // Access the A-Frame scene
-            const scene = document.querySelector('a-scene');
+    function onDocumentTouchEnd() {
+        isUserInteracting = false;
+    }
 
-            scene.addEventListener('enter-vr', function (evt) {
-                if (scene.is('ar-mode')) {
-                    instructions.textContent = 'Point your device to a flat surface.';
-                    placeButton.style.display = 'block';
-                }
-            });
+    function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+    }
 
-            scene.addEventListener('exit-vr', function (evt) {
-                instructions.textContent = 'Exiting AR mode.';
-                placeButton.style.display = 'none';
-            });
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
 
-            placeButton.addEventListener('click', function() {
-                if (!isPlaced) {
-                    model.setAttribute('visible', true);
-                    
-                    // Place the model 1 meter in front of the camera
-                    const camera = document.querySelector('a-entity[camera]');
-                    const cameraEl = camera.object3D;
-                    const position = new THREE.Vector3();
-                    cameraEl.getWorldPosition(position);
-
-                    const direction = new THREE.Vector3();
-                    cameraEl.getWorldDirection(direction);
-
-                    const newPosition = position.clone().add(direction.multiplyScalar(1));
-
-                    model.setAttribute('position', newPosition);
-                    model.setAttribute('rotation', '0 0 0');
-
-                    isPlaced = true;
-                    placeButton.textContent = 'Adjust Model';
-                    instructions.textContent = 'Model placed! Walk around to view it.';
-                }
-            });
-
-            // Add click interaction for scaling the model
-            model.addEventListener('click', function() {
-                if (isPlaced) {
-                    const currentScale = model.getAttribute('scale');
-                    const newScale = {
-                        x: currentScale.x * 1.2,
-                        y: currentScale.y * 1.2,
-                        z: currentScale.z * 1.2
-                    };
-                    model.setAttribute('scale', `${newScale.x} ${newScale.y} ${newScale.z}`);
-                }
-            });
-
-            // Update instructions based on AR session status
-            scene.addEventListener('sessionstart', function () {
-                instructions.textContent = 'AR session started. Place your model.';
-            });
-
-            scene.addEventListener('sessionend', function () {
-                instructions.textContent = 'AR session ended.';
-            });
-        };
-    </script>
+    init();
+</script>
 </body>
 </html>
