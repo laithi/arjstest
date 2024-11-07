@@ -1,89 +1,128 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
-  <head>
-    <meta charset='utf-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1, user-scalable=no'>
-    <title>Three.js WebXR Immersive VR</title>
-    <script type="module">
-      import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js';
-      import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/webxr/VRButton.js';
-      import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/loaders/GLTFLoader.js';
-
-      let scene, camera, renderer;
-      let model = null;
-
-      // Initialize the Three.js scene
-      function init() {
-        scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.6, 3); // Position the camera
-
-        renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.xr.enabled = true; // Enable WebXR
-        document.body.appendChild(renderer.domElement);
-
-        // Load the "future museum" GLTF model
-        const loader = new GLTFLoader();
-        loader.load('https://raw.githubusercontent.com/laithi/arjstest/main/future%20museum.gltf', (gltf) => {
-          model = gltf.scene;
-          scene.add(model);
-        }, undefined, (error) => {
-          console.error('An error occurred loading the model:', error);
-        });
-
-        // Skybox setup
-        const textureLoader = new THREE.TextureLoader();
-        const skyboxTexture = textureLoader.load('media/textures/milky-way-4k.png');
-        scene.background = skyboxTexture;
-
-        // Lighting
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(1, 1, 1).normalize();
-        scene.add(light);
-
-        // Handle window resizing
-        window.addEventListener('resize', onWindowResize, false);
-
-        // Attempt to enter VR automatically
-        try {
-          renderer.xr.setSessionInit({ optionalFeatures: ['local-floor', 'bounded-floor'] });
-          renderer.xr.getController(0); // Initialize controllers if needed
-          navigator.xr.requestSession('immersive-vr').then((session) => {
-            renderer.xr.setSession(session);
-          }).catch((error) => {
-            console.warn('Unable to start XR session:', error);
-          });
-        } catch (e) {
-          console.warn('WebXR not supported or failed:', e);
+<head>
+    <title>WebAR 3D Model Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ar.js/2.2.2/aframe-ar.js"></script>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
         }
-      }
+        #placeButton {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            background: #fff;
+            border: none;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        .ar-overlay {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="instructions" class="ar-overlay">Point your camera at a flat surface</div>
+    <button id="placeButton">Place 3D Model</button>
+    
+    <a-scene
+        vr-mode-ui="enabled: false"
+        embedded
+        arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
+        
+        <!-- Camera -->
+        <a-entity camera position="0 1.6 0"></a-entity>
+        
+        <!-- 3D Model -->
+        <a-entity
+            id="model"
+            gltf-model="https://github.com/laithi/arjstest/blob/main/future%20museum.gltf"
+            position="0 0 -5"
+            scale="0.1 0.1 0.1"
+            rotation="0 0 0"
+            visible="false">
+        </a-entity>
+    </a-scene>
 
-      // Update camera aspect and renderer size when window resizes
-      function onWindowResize() {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      }
+    <script>
+        window.addEventListener('load', function () {
+            const model = document.getElementById('model');
+            const placeButton = document.getElementById('placeButton');
+            const instructions = document.getElementById('instructions');
+            let isPlaced = false;
 
-      // Render loop for XR session
-      function animate() {
-        renderer.setAnimationLoop(() => {
-          if (model) {
-            model.rotation.y += 0.01; // Simple rotation animation for the model
-          }
-          renderer.render(scene, camera);
+            // Handle surface detection
+            const scene = document.querySelector('a-scene');
+            scene.addEventListener('enter-vr', function() {
+                if (navigator.xr) {
+                    navigator.xr.isSessionSupported('immersive-ar')
+                        .then((supported) => {
+                            if (supported) {
+                                instructions.textContent = 'AR supported! Point at a surface';
+                            } else {
+                                instructions.textContent = 'AR not supported on this device';
+                            }
+                        });
+                }
+            });
+
+            // Place model when button is clicked
+            placeButton.addEventListener('click', function() {
+                if (!isPlaced) {
+                    model.setAttribute('visible', true);
+                    // Get camera position and place model 2 meters in front
+                    const camera = document.querySelector('[camera]');
+                    const position = camera.getAttribute('position');
+                    const rotation = camera.getAttribute('rotation');
+                    
+                    // Calculate position in front of camera
+                    const radians = rotation.y * (Math.PI / 180);
+                    const x = position.x - Math.sin(radians) * 2;
+                    const z = position.z - Math.cos(radians) * 2;
+                    
+                    model.setAttribute('position', `${x} 0 ${z}`);
+                    isPlaced = true;
+                    placeButton.textContent = 'Adjust Model';
+                    instructions.textContent = 'Model placed! You can walk around it';
+                }
+            });
+
+            // Handle model interaction
+            model.addEventListener('click', function(evt) {
+                if (isPlaced) {
+                    // Add interaction logic here
+                    const scale = model.getAttribute('scale');
+                    model.setAttribute('scale', {
+                        x: scale.x * 1.2,
+                        y: scale.y * 1.2,
+                        z: scale.z * 1.2
+                    });
+                }
+            });
+
+            // Error handling
+            scene.addEventListener('camera-error', function() {
+                instructions.textContent = 'Camera permission denied';
+            });
+
+            scene.addEventListener('ar-error', function() {
+                instructions.textContent = 'AR initialization failed';
+            });
         });
-      }
-
-      // Start the XR application
-      init();
-      animate();
     </script>
-  </head>
-  <body>
-    <main style='text-align: center;'>
-      <p>If the VR session does not start automatically, please check browser security settings.</p> 
-    </main>
-  </body>
+</body>
 </html>
