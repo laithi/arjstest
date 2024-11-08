@@ -1,88 +1,130 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Markerless WebAR 3D Model</title>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/jsm/libs/stats.module.js"></script>
-</head>
-<body style="margin: 0; overflow: hidden;">
-<script>
-    let scene, camera, renderer, model;
-    let initCameraZ = 2; // Initial distance of the model
-    let isUserInteracting = false, scale = 1;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebXR Example</title>
+    <style>
+      body {
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: #f0f0f0;
+      }
+      canvas {
+        border-radius: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="xrCanvas"></canvas>
 
-    function init() {
-        scene = new THREE.Scene();
+    <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
+    <script>
+      // Check if WebXR is supported
+      if (!navigator.xr) {
+        alert("WebXR is not supported in this browser.");
+        return;
+      }
 
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = initCameraZ;
+      // Initialize the renderer
+      const renderer = new THREE.WebGLRenderer({
+        canvas: document.getElementById("xrCanvas"),
+      });
+      renderer.setSize(window.innerWidth, window.innerHeight);
 
-        renderer = new THREE.WebGLRenderer({ alpha: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+      // Initialize the scene
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      scene.position.z = 5;
 
-        const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-        light.position.set(0, 20, 0);
-        scene.add(light);
+      // Load a 3D model using Three.js
+      const loader = new THREE.GLTFLoader();
+      loader.load("path/to/your/model.gltf", function (gltf) {
+        const model = gltf.scene;
+        scene.add(model);
+      });
 
-        // Load 3D Model
-        const loader = new THREE.GLTFLoader();
-        loader.load('https://github.com/laithi/arjstest/blob/main/future%20museum.gltf', function(gltf) {
-            model = gltf.scene;
-            model.scale.set(1, 1, 1);
-            scene.add(model);
-        });
-
-        // Add event listeners for touch gestures
-        document.addEventListener('touchstart', onDocumentTouchStart, false);
-        document.addEventListener('touchmove', onDocumentTouchMove, false);
-        document.addEventListener('touchend', onDocumentTouchEnd, false);
-
-        animate();
-    }
-
-    function onDocumentTouchStart(event) {
-        isUserInteracting = true;
-    }
-
-    function onDocumentTouchMove(event) {
-        if (isUserInteracting && model) {
-            // Adjust model scale for zoom gesture (using pinch)
-            if (event.touches.length == 2) {
-                const dist = Math.hypot(
-                    event.touches[0].pageX - event.touches[1].pageX,
-                    event.touches[0].pageY - event.touches[1].pageY
-                );
-                scale = dist / 300; // Adjust scale factor based on touch distance
-                model.scale.set(scale, scale, scale);
-            }
-            // Rotate model with single touch drag
-            else if (event.touches.length == 1) {
-                model.rotation.y += event.touches[0].movementX * 0.005;
-                model.rotation.x += event.touches[0].movementY * 0.005;
-            }
-        }
-    }
-
-    function onDocumentTouchEnd() {
-        isUserInteracting = false;
-    }
-
-    function animate() {
+      // Render loop
+      function animate() {
         requestAnimationFrame(animate);
         renderer.render(scene, camera);
-    }
+      }
 
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+      // Start the animation
+      animate();
 
-    init();
-</script>
-</body>
+      // Handle VR interaction
+      navigator.xr.isSessionSupported().then((supported) => {
+        if (supported) {
+          navigator.xr
+            .requestSession({ requiredFeatures: ["immediate-mode"] })
+            .then((session) => {
+              session.addEventListener("end", () => {
+                console.log("VR session ended");
+              });
+
+              const gl = session.context;
+              const gltf = gl.createVertexArrayObject(null, gl.ARRAY_BUFFER);
+              const vertexBuffer = gl.createBuffer();
+              gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+              gl.bufferData(
+                gl.ARRAY_BUFFER,
+                new Float32Array([
+                  /* your vertex data */
+                ]),
+                gl.STATIC_DRAW
+              );
+
+              const positionAttribute = gl.getAttribLocation(
+                gltf,
+                "a_position"
+              );
+              gl.enableVertexAttribArray(positionAttribute);
+              gl.vertexAttribPointer(
+                positionAttribute,
+                3,
+                gl.FLOAT,
+                false,
+                0,
+                0
+              );
+
+              const modelViewProjectionMatrix = new THREE.Matrix4();
+              modelViewProjectionMatrix.multiplyMatrices(
+                camera.matrixWorld,
+                gltf.modelMatrix
+              );
+              modelViewProjectionMatrix.multiplyMatrices(
+                model.matrixWorld,
+                gltf.modelMatrix
+              );
+
+              const modelViewProjectionUniform = gl.getUniformLocation(
+                gltf.program,
+                "u_model_view_projection_matrix"
+              );
+              gl.uniformMatrix4fv(
+                modelViewProjectionUniform,
+                false,
+                modelViewProjectionMatrix.elements
+              );
+
+              gl.drawArrays(gl.TRIANGLES, 0, gl.gltf.attributes.position.count);
+
+              session.end();
+            });
+        } else {
+          console.log("WebXR is not supported on this device.");
+        }
+      });
+    </script>
+  </body>
 </html>
