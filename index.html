@@ -1,144 +1,112 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Simple Three.js WebAR</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basic WebXR Test</title>
     <style>
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-        }
-        #debug-info {
+        body { margin: 0; }
+        #status {
             position: fixed;
             top: 10px;
             left: 10px;
-            background: rgba(0,0,0,0.7);
+            background: black;
             color: white;
             padding: 10px;
             font-family: monospace;
-            z-index: 1000;
+            z-index: 999;
         }
     </style>
 </head>
 <body>
-    <div id="debug-info">Initializing...</div>
+    <div id="status">Starting...</div>
+    
+    <script async src="https://unpkg.com/es-module-shims/dist/es-module-shims.js"></script>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.157.0/examples/jsm/"
+        }
+    }
+    </script>
 
     <script type="module">
-        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js';
-        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
-        import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/webxr/ARButton.js';
+        import * as THREE from 'three';
+        import { ARButton } from 'three/addons/webxr/ARButton.js';
 
-        const debugInfo = document.getElementById('debug-info');
-        function updateDebug(text) {
-            debugInfo.innerHTML += '<br>' + text;
-            console.log(text);
+        const status = document.getElementById('status');
+        
+        function log(message) {
+            console.log(message);
+            status.innerHTML += '<br>' + message;
         }
 
-        let camera, scene, renderer, model;
-
-        // First, check if WebXR is available
+        // Check for WebXR support
         if (!navigator.xr) {
-            updateDebug('WebXR not supported');
-            throw new Error('WebXR not supported');
+            log('WebXR not supported by this browser');
+        } else {
+            log('WebXR found, checking AR...');
         }
 
-        updateDebug('WebXR found, checking AR support...');
+        // Initialize Three.js
+        const scene = new THREE.Scene();
+        log('Scene created');
 
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        log('Camera created');
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.xr.enabled = true;
+        document.body.appendChild(renderer.domElement);
+        log('Renderer created');
+
+        // Add a simple cube
+        const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+        const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const cube = new THREE.Mesh(geometry, material);
+        cube.position.z = -0.5;  // Place it half a meter in front
+        scene.add(cube);
+        log('Added red cube');
+
+        // Add some light
+        const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+        scene.add(light);
+        log('Added light');
+
+        // Check AR support and create button
         navigator.xr.isSessionSupported('immersive-ar')
             .then((supported) => {
                 if (supported) {
-                    updateDebug('AR is supported');
-                    init();
+                    log('AR is supported!');
+                    const button = ARButton.createButton(renderer);
+                    document.body.appendChild(button);
+                    log('AR button created');
                 } else {
-                    updateDebug('AR not supported on this device');
+                    log('AR not supported on this device');
                 }
             })
             .catch(err => {
-                updateDebug('Error checking AR support: ' + err);
+                log('Error checking AR support: ' + err);
             });
 
-        function init() {
-            updateDebug('Initializing...');
-
-            // Scene setup
-            scene = new THREE.Scene();
-            updateDebug('Scene created');
-
-            // Camera setup
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            updateDebug('Camera created');
-
-            // Renderer setup
-            renderer = new THREE.WebGLRenderer({
-                antialias: true,
-                alpha: true
-            });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.xr.enabled = true;
-            document.body.appendChild(renderer.domElement);
-            updateDebug('Renderer created');
-
-            // Add simple cube as test object
-            const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-            const cube = new THREE.Mesh(geometry, material);
-            cube.position.set(0, 0, -1);
-            scene.add(cube);
-            updateDebug('Test cube added');
-
-            // Lights
-            const light = new THREE.AmbientLight(0xffffff);
-            scene.add(light);
-            updateDebug('Lights added');
-
-            try {
-                const arButton = ARButton.createButton(renderer, {
-                    requiredFeatures: ['hit-test'],
-                    optionalFeatures: ['dom-overlay'],
-                    domOverlay: { root: document.body }
-                });
-                document.body.appendChild(arButton);
-                updateDebug('AR button created');
-            } catch (error) {
-                updateDebug('Error creating AR button: ' + error);
-            }
-
-            // Load Model
-            const loader = new GLTFLoader();
-            loader.load(
-                'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF/Duck.gltf',
-                function(gltf) {
-                    model = gltf.scene;
-                    model.scale.set(0.1, 0.1, 0.1);
-                    scene.add(model);
-                    updateDebug('Model loaded successfully');
-                },
-                function(xhr) {
-                    updateDebug('Loading model: ' + (xhr.loaded / xhr.total * 100) + '%');
-                },
-                function(error) {
-                    updateDebug('Error loading model: ' + error);
-                }
-            );
-
-            animate();
-            updateDebug('Animation loop started');
-        }
-
-        function animate() {
-            renderer.setAnimationLoop(function() {
-                renderer.render(scene, camera);
-            });
-        }
+        // Animation loop
+        renderer.setAnimationLoop(function () {
+            cube.rotation.x += 0.01;
+            cube.rotation.y += 0.01;
+            renderer.render(scene, camera);
+        });
 
         // Handle window resizing
-        window.addEventListener('resize', function() {
+        window.addEventListener('resize', onWindowResize, false);
+
+        function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        }
     </script>
 </body>
 </html>
