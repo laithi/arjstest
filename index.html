@@ -1,199 +1,144 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Simple Three.js WebAR</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <style>
-    body { 
-      margin: 0; 
-      overflow: hidden; 
-      -webkit-user-select: none;
-      user-select: none;
-    }
-    #error-message {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      padding: 20px;
-      border-radius: 10px;
-      text-align: center;
-      display: none;
-    }
-    .ar-button {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 12px 24px;
-      background: #fff;
-      border: none;
-      border-radius: 4px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Simple Three.js WebAR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+        }
+        #debug-info {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            z-index: 1000;
+        }
+    </style>
 </head>
 <body>
-  <div id="error-message"></div>
-  <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.150.0/build/three.module.js';
-    import { GLTFLoader } from 'https://unpkg.com/three@0.150.0/examples/jsm/loaders/GLTFLoader.js';
-    import { ARButton } from 'https://unpkg.com/three@0.150.0/examples/jsm/webxr/ARButton.js';
+    <div id="debug-info">Initializing...</div>
 
-    let camera, scene, renderer, model;
-    let hitTestSource = null;
-    let hitTestSourceRequested = false;
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js';
+        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
+        import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/webxr/ARButton.js';
 
-    // Check WebXR support
-    if ('xr' in navigator) {
-      navigator.xr.isSessionSupported('immersive-ar')
-        .then((supported) => {
-          if (!supported) {
-            showError('WebXR AR not supported in this browser');
-          } else {
-            init();
+        const debugInfo = document.getElementById('debug-info');
+        function updateDebug(text) {
+            debugInfo.innerHTML += '<br>' + text;
+            console.log(text);
+        }
+
+        let camera, scene, renderer, model;
+
+        // First, check if WebXR is available
+        if (!navigator.xr) {
+            updateDebug('WebXR not supported');
+            throw new Error('WebXR not supported');
+        }
+
+        updateDebug('WebXR found, checking AR support...');
+
+        navigator.xr.isSessionSupported('immersive-ar')
+            .then((supported) => {
+                if (supported) {
+                    updateDebug('AR is supported');
+                    init();
+                } else {
+                    updateDebug('AR not supported on this device');
+                }
+            })
+            .catch(err => {
+                updateDebug('Error checking AR support: ' + err);
+            });
+
+        function init() {
+            updateDebug('Initializing...');
+
+            // Scene setup
+            scene = new THREE.Scene();
+            updateDebug('Scene created');
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            updateDebug('Camera created');
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({
+                antialias: true,
+                alpha: true
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.xr.enabled = true;
+            document.body.appendChild(renderer.domElement);
+            updateDebug('Renderer created');
+
+            // Add simple cube as test object
+            const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            const cube = new THREE.Mesh(geometry, material);
+            cube.position.set(0, 0, -1);
+            scene.add(cube);
+            updateDebug('Test cube added');
+
+            // Lights
+            const light = new THREE.AmbientLight(0xffffff);
+            scene.add(light);
+            updateDebug('Lights added');
+
+            try {
+                const arButton = ARButton.createButton(renderer, {
+                    requiredFeatures: ['hit-test'],
+                    optionalFeatures: ['dom-overlay'],
+                    domOverlay: { root: document.body }
+                });
+                document.body.appendChild(arButton);
+                updateDebug('AR button created');
+            } catch (error) {
+                updateDebug('Error creating AR button: ' + error);
+            }
+
+            // Load Model
+            const loader = new GLTFLoader();
+            loader.load(
+                'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF/Duck.gltf',
+                function(gltf) {
+                    model = gltf.scene;
+                    model.scale.set(0.1, 0.1, 0.1);
+                    scene.add(model);
+                    updateDebug('Model loaded successfully');
+                },
+                function(xhr) {
+                    updateDebug('Loading model: ' + (xhr.loaded / xhr.total * 100) + '%');
+                },
+                function(error) {
+                    updateDebug('Error loading model: ' + error);
+                }
+            );
+
             animate();
-          }
-        })
-        .catch(err => {
-          showError('Error checking WebXR support: ' + err.message);
+            updateDebug('Animation loop started');
+        }
+
+        function animate() {
+            renderer.setAnimationLoop(function() {
+                renderer.render(scene, camera);
+            });
+        }
+
+        // Handle window resizing
+        window.addEventListener('resize', function() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         });
-    } else {
-      showError('WebXR not supported in this browser');
-    }
-
-    function showError(message) {
-      const errorElement = document.getElementById('error-message');
-      errorElement.textContent = message;
-      errorElement.style.display = 'block';
-    }
-
-    function init() {
-      scene = new THREE.Scene();
-
-      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-
-      renderer = new THREE.WebGLRenderer({ 
-        antialias: true, 
-        alpha: true,
-        preserveDrawingBuffer: true
-      });
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      document.body.appendChild(renderer.domElement);
-
-      // Create custom AR button
-      const button = ARButton.createButton(renderer, {
-        requiredFeatures: ['hit-test'],
-        optionalFeatures: ['dom-overlay'],
-        domOverlay: { root: document.body }
-      });
-      button.className = 'ar-button';
-      document.body.appendChild(button);
-
-      // Improved lighting
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-      scene.add(ambientLight);
-      
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      directionalLight.position.set(0.5, 1, 0.25);
-      scene.add(directionalLight);
-
-      // Load Model with progress indicator
-      const loader = new GLTFLoader();
-      loader.load(
-        'https://threejs.org/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf',
-        function(gltf) {
-          model = gltf.scene;
-          model.scale.set(0.5, 0.5, 0.5);
-          model.visible = false;
-          
-          // Add shadow support
-          model.traverse((node) => {
-            if (node.isMesh) {
-              node.castShadow = true;
-              node.receiveShadow = true;
-            }
-          });
-          
-          scene.add(model);
-        },
-        function(xhr) {
-          console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-        },
-        function(error) {
-          console.error('An error occurred while loading the model:', error);
-          showError('Failed to load 3D model');
-        }
-      );
-
-      window.addEventListener('resize', onWindowResize, false);
-    }
-
-    function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-
-    function animate() {
-      renderer.setAnimationLoop(render);
-    }
-
-    async function render(timestamp, frame) {
-      if (!frame) return;
-
-      const referenceSpace = renderer.xr.getReferenceSpace();
-      const session = renderer.xr.getSession();
-
-      if (!hitTestSourceRequested) {
-        try {
-          const viewerSpace = await session.requestReferenceSpace('viewer');
-          hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
-          hitTestSourceRequested = true;
-        } catch (error) {
-          console.error('Error requesting hit test source:', error);
-        }
-      }
-
-      if (hitTestSource && model) {
-        try {
-          const hitTestResults = frame.getHitTestResults(hitTestSource);
-          
-          if (hitTestResults.length > 0) {
-            const hit = hitTestResults[0];
-            const pose = hit.getPose(referenceSpace);
-            
-            if (pose) {
-              model.visible = true;
-              model.position.set(
-                pose.transform.position.x,
-                pose.transform.position.y,
-                pose.transform.position.z
-              );
-              model.quaternion.set(
-                pose.transform.orientation.x,
-                pose.transform.orientation.y,
-                pose.transform.orientation.z,
-                pose.transform.orientation.w
-              );
-              
-              // Add subtle rotation animation
-              model.rotation.y += 0.01;
-            }
-          }
-        } catch (error) {
-          console.error('Error processing hit test results:', error);
-        }
-      }
-
-      renderer.render(scene, camera);
-    }
-  </script>
+    </script>
 </body>
 </html>
