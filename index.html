@@ -1,130 +1,194 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebXR Example</title>
-    <style>
-      body {
-        margin: 0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        background-color: #f0f0f0;
-      }
-      canvas {
-        border-radius: 10px;
-      }
-    </style>
-  </head>
-  <body>
-    <canvas id="xrCanvas"></canvas>
+<head>
+  <meta charset="UTF-8">
+  <title>Three.js WebAR Example</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #instructions {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 300px;
+      padding: 10px;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      font-family: Arial, sans-serif;
+      z-index: 1;
+      border-radius: 8px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      background-color: #28a745;
+      color: white;
+    }
+    button:hover {
+      background-color: #218838;
+    }
+  </style>
+</head>
+<body>
+  <div id="instructions">
+    <p>Tap the button below to enter AR.</p>
+    <button id="ar-button">Enter AR</button>
+    <p>Use pinch gestures to scale the model and drag to rotate it.</p>
+  </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
-    <script>
-      // Check if WebXR is supported
-      if (!navigator.xr) {
-        alert("WebXR is not supported in this browser.");
-        return;
-      }
+  <!-- Three.js and Modules -->
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.150.0/build/three.module.js';
+    import { GLTFLoader } from 'https://unpkg.com/three@0.150.0/examples/jsm/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.150.0/examples/jsm/controls/OrbitControls.js';
+    import { ARButton } from 'https://unpkg.com/three@0.150.0/examples/jsm/webxr/ARButton.js';
 
-      // Initialize the renderer
-      const renderer = new THREE.WebGLRenderer({
-        canvas: document.getElementById("xrCanvas"),
-      });
+    let camera, scene, renderer;
+    let model;
+    let scaleFactor = 1;
+    let isDragging = false;
+    let previousTouchDistance = null;
+    let previousX = 0;
+    let previousY = 0;
+
+    init();
+    animate();
+
+    function init() {
+      // Create the scene
+      scene = new THREE.Scene();
+
+      // Set up camera
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+      // Set up renderer with WebXR enabled
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      document.body.appendChild(renderer.domElement);
 
-      // Initialize the scene
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(
-        75,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000
-      );
-      scene.position.z = 5;
+      // Add AR Button
+      const arButton = ARButton.createButton(renderer, {
+        requiredFeatures: ['local', 'hit-test']
+      });
+      document.body.appendChild(arButton);
 
-      // Load a 3D model using Three.js
-      const loader = new THREE.GLTFLoader();
-      loader.load("path/to/your/model.gltf", function (gltf) {
-        const model = gltf.scene;
-        scene.add(model);
+      // Hide default AR button and use custom button
+      arButton.style.display = 'none';
+      const customARButton = document.getElementById('ar-button');
+      customARButton.addEventListener('click', () => {
+        renderer.xr.setSession(renderer.xr.getSession() || navigator.xr.requestSession('immersive-ar', {
+          requiredFeatures: ['local', 'hit-test']
+        }));
+        customARButton.style.display = 'none';
       });
 
-      // Render loop
-      function animate() {
-        requestAnimationFrame(animate);
-        renderer.render(scene, camera);
+      // Add a light to the scene
+      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+      light.position.set(0.5, 1, 0.25);
+      scene.add(light);
+
+      // Load a 3D model (replace the URL with your model)
+      const loader = new GLTFLoader();
+      loader.load('https://threejs.org/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf', function(gltf){
+        model = gltf.scene;
+        model.scale.set(0.5, 0.5, 0.5);
+        scene.add(model);
+      }, undefined, function(error){
+        console.error('An error happened while loading the model:', error);
+      });
+
+      // Handle window resize
+      window.addEventListener('resize', onWindowResize, false);
+
+      // Add touch event listeners for gestures
+      renderer.domElement.addEventListener('touchstart', onTouchStart, false);
+      renderer.domElement.addEventListener('touchmove', onTouchMove, false);
+      renderer.domElement.addEventListener('touchend', onTouchEnd, false);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+      renderer.setAnimationLoop(render);
+    }
+
+    function render(timestamp, frame) {
+      if (frame) {
+        const referenceSpace = renderer.xr.getReferenceSpace();
+        const session = renderer.xr.getSession();
+
+        // Position the model 1 meter in front of the camera
+        if (model) {
+          model.position.set(0, 0, -1); // Adjust as needed
+        }
       }
 
-      // Start the animation
-      animate();
+      renderer.render(scene, camera);
+    }
 
-      // Handle VR interaction
-      navigator.xr.isSessionSupported().then((supported) => {
-        if (supported) {
-          navigator.xr
-            .requestSession({ requiredFeatures: ["immediate-mode"] })
-            .then((session) => {
-              session.addEventListener("end", () => {
-                console.log("VR session ended");
-              });
+    // Touch gesture handlers
+    function onTouchStart(event) {
+      if (event.touches.length === 1) {
+        // Single touch - start rotating
+        isDragging = true;
+        previousX = event.touches[0].clientX;
+        previousY = event.touches[0].clientY;
+      } else if (event.touches.length === 2) {
+        // Two touches - start scaling
+        isDragging = false;
+        previousTouchDistance = getTouchDistance(event.touches[0], event.touches[1]);
+      }
+    }
 
-              const gl = session.context;
-              const gltf = gl.createVertexArrayObject(null, gl.ARRAY_BUFFER);
-              const vertexBuffer = gl.createBuffer();
-              gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-              gl.bufferData(
-                gl.ARRAY_BUFFER,
-                new Float32Array([
-                  /* your vertex data */
-                ]),
-                gl.STATIC_DRAW
-              );
+    function onTouchMove(event) {
+      event.preventDefault();
+      if (event.touches.length === 1 && isDragging && model) {
+        // Handle rotation
+        const touch = event.touches[0];
+        const deltaX = touch.clientX - previousX;
+        const deltaY = touch.clientY - previousY;
+        previousX = touch.clientX;
+        previousY = touch.clientY;
 
-              const positionAttribute = gl.getAttribLocation(
-                gltf,
-                "a_position"
-              );
-              gl.enableVertexAttribArray(positionAttribute);
-              gl.vertexAttribPointer(
-                positionAttribute,
-                3,
-                gl.FLOAT,
-                false,
-                0,
-                0
-              );
-
-              const modelViewProjectionMatrix = new THREE.Matrix4();
-              modelViewProjectionMatrix.multiplyMatrices(
-                camera.matrixWorld,
-                gltf.modelMatrix
-              );
-              modelViewProjectionMatrix.multiplyMatrices(
-                model.matrixWorld,
-                gltf.modelMatrix
-              );
-
-              const modelViewProjectionUniform = gl.getUniformLocation(
-                gltf.program,
-                "u_model_view_projection_matrix"
-              );
-              gl.uniformMatrix4fv(
-                modelViewProjectionUniform,
-                false,
-                modelViewProjectionMatrix.elements
-              );
-
-              gl.drawArrays(gl.TRIANGLES, 0, gl.gltf.attributes.position.count);
-
-              session.end();
-            });
-        } else {
-          console.log("WebXR is not supported on this device.");
+        // Rotate model based on touch movement
+        model.rotation.y += deltaX * 0.005; // Rotate around Y axis
+        model.rotation.x += deltaY * 0.005; // Rotate around X axis
+      } else if (event.touches.length === 2 && model) {
+        // Handle scaling
+        const currentDistance = getTouchDistance(event.touches[0], event.touches[1]);
+        if (previousTouchDistance !== null) {
+          const deltaDistance = currentDistance - previousTouchDistance;
+          scaleFactor += deltaDistance * 0.005;
+          scaleFactor = Math.max(0.1, Math.min(scaleFactor, 5)); // Clamp scaleFactor
+          model.scale.set(scaleFactor, scaleFactor, scaleFactor);
         }
-      });
-    </script>
-  </body>
+        previousTouchDistance = currentDistance;
+      }
+    }
+
+    function onTouchEnd(event) {
+      if (event.touches.length < 2) {
+        previousTouchDistance = null;
+      }
+      if (event.touches.length === 0) {
+        isDragging = false;
+      }
+    }
+
+    function getTouchDistance(touch1, touch2) {
+      const dx = touch2.clientX - touch1.clientX;
+      const dy = touch2.clientY - touch1.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+  </script>
+</body>
 </html>
