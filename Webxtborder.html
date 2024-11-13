@@ -3,9 +3,10 @@
 <head>
     <title>AR Binary Border</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body { margin: 0; }
-        canvas { display: block; }
+        canvas { display: block; position: fixed; top: 0; left: 0; }
         #ar-button {
             position: absolute;
             bottom: 20px;
@@ -44,35 +45,49 @@
     <div id="binary-overlay"></div>
 
     <script>
+        let camera, scene, renderer;
         let isRunning = false;
         const overlay = document.getElementById('binary-overlay');
         const binaryChars = ['0', '1'];
+
+        // Initialize Three.js scene
+        function initScene() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({
+                antialias: true,
+                alpha: true
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            // Add ambient light
+            const light = new THREE.AmbientLight(0xffffff, 1);
+            scene.add(light);
+
+            // Start render loop
+            renderer.setAnimationLoop(render);
+        }
         
         function createBinaryBorder() {
-            // Clear existing content
             overlay.innerHTML = '';
             
             const width = window.innerWidth;
             const height = window.innerHeight;
-            const spacing = 15; // Space between binary digits
+            const spacing = 15;
             
-            // Calculate number of characters needed
             const horizontalCount = Math.floor(width / spacing);
             const verticalCount = Math.floor(height / spacing);
             
-            // Create top and bottom rows
             for (let i = 0; i < horizontalCount; i++) {
-                // Top row
                 createBinaryElement(i * spacing, 0);
-                // Bottom row
                 createBinaryElement(i * spacing, height - 12);
             }
             
-            // Create left and right columns
             for (let i = 0; i < verticalCount; i++) {
-                // Left column
                 createBinaryElement(0, i * spacing);
-                // Right column
                 createBinaryElement(width - 12, i * spacing);
             }
         }
@@ -94,6 +109,8 @@
         }
         
         async function initAR() {
+            initScene(); // Initialize Three.js scene first
+            
             const button = document.getElementById('ar-button');
             
             if (!navigator.xr) {
@@ -121,13 +138,9 @@
                     isRunning = false;
                     overlay.style.display = 'none';
                     button.textContent = 'Start AR';
-                    try {
-                        const session = renderer.xr.getSession();
-                        if (session) {
-                            await session.end();
-                        }
-                    } catch (error) {
-                        console.error(error);
+                    const session = renderer.xr.getSession();
+                    if (session) {
+                        await session.end();
                     }
                 } else {
                     try {
@@ -135,6 +148,8 @@
                             optionalFeatures: ['dom-overlay'],
                             domOverlay: { root: document.body }
                         });
+                        
+                        await renderer.xr.setSession(session);
                         
                         isRunning = true;
                         button.textContent = 'Stop AR';
@@ -147,7 +162,6 @@
                             button.textContent = 'Start AR';
                         });
                         
-                        // Start the animation
                         animateBinary();
                     } catch (error) {
                         console.error(error);
@@ -157,15 +171,23 @@
             });
         }
         
+        function render(timestamp, frame) {
+            renderer.render(scene, camera);
+        }
+        
         function animateBinary() {
             if (isRunning) {
                 updateBinaryValues();
-                setTimeout(animateBinary, 500); // Update every 500ms
+                setTimeout(animateBinary, 500);
             }
         }
         
-        // Handle window resizing
         window.addEventListener('resize', () => {
+            if (camera && renderer) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
             if (isRunning) {
                 createBinaryBorder();
             }
