@@ -20,7 +20,7 @@
             
             renderer = new THREE.WebGLRenderer({ 
                 antialias: true,
-                alpha: true // Important for AR to show camera feed
+                alpha: true
             });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -28,7 +28,7 @@
             document.body.appendChild(renderer.domElement);
 
             // Create frame geometry
-            const frameGeometry = new THREE.PlaneGeometry(1, 1.5); // Adjusted size for better AR viewing
+            const frameGeometry = new THREE.PlaneGeometry(1, 1.5);
             
             // Load the border texture
             const textureLoader = new THREE.TextureLoader();
@@ -42,37 +42,46 @@
             });
 
             frame = new THREE.Mesh(frameGeometry, frameMaterial);
-            frame.position.z = -1.5; // Position the frame in front of the camera
+            frame.position.z = -1.5;
             scene.add(frame);
 
-            // Set up AR button and session
+            // Set up AR button
             const arButton = document.getElementById('startAR');
             arButton.addEventListener('click', onStartAR);
 
-            // Handle window resizing
             window.addEventListener('resize', onWindowResize, false);
         }
 
         async function onStartAR() {
-            // Check if AR is supported
             if (!navigator.xr) {
                 alert("WebXR not available");
                 return;
             }
 
             try {
-                // Request an AR session
+                // Simplified AR session request
                 const session = await navigator.xr.requestSession('immersive-ar', {
-                    requiredFeatures: ['hit-test'],
                     optionalFeatures: ['dom-overlay'],
                     domOverlay: { root: document.body }
                 });
 
-                // Set up session
                 await renderer.xr.setSession(session);
                 session.addEventListener('end', onSessionEnd);
+                
+                // Try to get viewer reference space
+                try {
+                    const referenceSpace = await session.requestReferenceSpace('viewer');
+                    renderer.xr.setReferenceSpace(referenceSpace);
+                } catch (e) {
+                    // If viewer space fails, try local space
+                    try {
+                        const referenceSpace = await session.requestReferenceSpace('local');
+                        renderer.xr.setReferenceSpace(referenceSpace);
+                    } catch (e) {
+                        console.error('Failed to get any reference space');
+                    }
+                }
 
-                // Start the AR experience
                 renderer.setAnimationLoop(render);
             } catch (err) {
                 console.error('Failed to start AR session:', err);
@@ -92,26 +101,27 @@
 
         function render(timestamp, frame) {
             if (frame) {
-                const pose = frame.getViewerPose(renderer.xr.getReferenceSpace('local'));
-                if (pose) {
-                    // Update frame position to follow camera
-                    const viewMatrix = pose.views[0].transform.matrix;
-                    const position = new THREE.Vector3();
-                    position.setFromMatrixPosition(viewMatrix);
-                    
-                    // Position frame in front of the camera
-                    frame.position.copy(position);
-                    frame.position.z -= 1.5;
-                    
-                    // Make frame face the camera
-                    frame.quaternion.copy(camera.quaternion);
+                const session = renderer.xr.getSession();
+                if (session) {
+                    const referenceSpace = renderer.xr.getReferenceSpace();
+                    if (referenceSpace) {
+                        const pose = frame.getViewerPose(referenceSpace);
+                        if (pose) {
+                            const view = pose.views[0];
+                            if (view) {
+                                // Update frame to follow camera
+                                frame.position.set(0, 0, -1.5);
+                                frame.rotation.copy(camera.rotation);
+                            }
+                        }
+                    }
                 }
             }
             
             renderer.render(scene, camera);
         }
 
-        // Check if AR is available
+        // Check AR availability
         if (navigator.xr) {
             navigator.xr.isSessionSupported('immersive-ar')
                 .then((supported) => {
