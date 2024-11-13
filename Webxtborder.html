@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebXR Frame View</title>
+    <title>WebXR AR Frame</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body { margin: 0; }
         canvas { display: block; }
-        #xr-button {
+        #ar-button {
             position: absolute;
             bottom: 20px;
             left: 50%;
@@ -21,7 +21,7 @@
     </style>
 </head>
 <body>
-    <button id="xr-button">Enter VR</button>
+    <button id="ar-button">Start AR</button>
     <script>
         let camera, scene, renderer;
         let frame;
@@ -32,13 +32,17 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                alpha: true // Important for AR to show camera feed
+            });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
 
             // Create frame geometry
-            const frameGeometry = new THREE.PlaneGeometry(2, 2);
+            // Making it slightly larger than the viewport
+            const frameGeometry = new THREE.PlaneGeometry(1.2, 1.6);
             
             // Load frame texture
             const textureLoader = new THREE.TextureLoader();
@@ -47,46 +51,63 @@
             const frameMaterial = new THREE.MeshBasicMaterial({
                 map: frameTexture,
                 transparent: true,
-                opacity: 0.8
+                opacity: 0.8,
+                side: THREE.DoubleSide // Visible from both sides
             });
 
             frame = new THREE.Mesh(frameGeometry, frameMaterial);
-            frame.position.z = -2; // Place frame 2 units in front of camera
+            frame.position.z = -1; // Place frame 1 unit in front of camera
             scene.add(frame);
+
+            // Add lights
+            const light = new THREE.AmbientLight(0xffffff, 1);
+            scene.add(light);
 
             // Handle window resizing
             window.addEventListener('resize', onWindowResize, false);
 
-            // Setup VR button
-            const button = document.querySelector('#xr-button');
-            button.addEventListener('click', onVRButtonClick);
+            // Setup AR button
+            const button = document.querySelector('#ar-button');
+            button.addEventListener('click', onARButtonClick);
 
-            // Check if XR is available
+            // Check if AR is available
             if (navigator.xr) {
-                navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
-                    supported ? button.disabled = false : button.textContent = 'VR Not Supported';
+                navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+                    if (supported) {
+                        button.disabled = false;
+                    } else {
+                        button.textContent = 'AR Not Supported';
+                    }
                 });
             } else {
                 button.textContent = 'XR Not Available';
             }
 
-            // Start animation loop
             renderer.setAnimationLoop(render);
         }
 
-        function onVRButtonClick() {
+        async function onARButtonClick() {
             if (renderer.xr.isPresenting) {
                 renderer.xr.getSession().end();
             } else {
-                navigator.xr.requestSession('immersive-vr', {
-                    optionalFeatures: ['local-floor', 'bounded-floor']
-                }).then(onSessionStarted);
+                try {
+                    const session = await navigator.xr.requestSession('immersive-ar', {
+                        requiredFeatures: ['hit-test'],
+                        optionalFeatures: ['dom-overlay'],
+                        domOverlay: { root: document.body }
+                    });
+                    
+                    renderer.xr.setReferenceSpaceType('local');
+                    await renderer.xr.setSession(session);
+                    document.querySelector('#ar-button').textContent = 'Exit AR';
+                    
+                    session.addEventListener('end', () => {
+                        document.querySelector('#ar-button').textContent = 'Start AR';
+                    });
+                } catch (error) {
+                    console.error('Error starting AR session:', error);
+                }
             }
-        }
-
-        function onSessionStarted(session) {
-            renderer.xr.setSession(session);
-            document.querySelector('#xr-button').textContent = 'Exit VR';
         }
 
         function onWindowResize() {
@@ -95,11 +116,21 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        function render() {
-            // Update frame position to always face camera
+        function render(timestamp, frame) {
             if (frame) {
-                frame.lookAt(camera.position);
+                const referenceSpace = renderer.xr.getReferenceSpace();
+                const pose = frame.getViewerPose(referenceSpace);
+                
+                if (pose) {
+                    // Update frame to follow camera
+                    const view = pose.views[0];
+                    const viewMatrix = new THREE.Matrix4().fromArray(view.transform.matrix);
+                    frame.position.setFromMatrixPosition(viewMatrix);
+                    frame.quaternion.setFromRotationMatrix(viewMatrix);
+                    frame.translateZ(-1); // Keep frame 1 unit in front
+                }
             }
+            
             renderer.render(scene, camera);
         }
     </script>
