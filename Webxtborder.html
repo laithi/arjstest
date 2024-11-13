@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebXR AR Frame</title>
+    <title>WebXR AR Binary Frame</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body { margin: 0; }
@@ -24,7 +24,8 @@
     <button id="ar-button">Start AR</button>
     <script>
         let camera, scene, renderer;
-        let frame;
+        let frameGroup;
+        const BORDER_WIDTH = 0.005; // 5px equivalent in 3D units
 
         init();
 
@@ -34,43 +35,28 @@
             
             renderer = new THREE.WebGLRenderer({ 
                 antialias: true,
-                alpha: true // Important for AR to show camera feed
+                alpha: true
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            // Create frame geometry
-            // Making it slightly larger than the viewport
-            const frameGeometry = new THREE.PlaneGeometry(1.2, 1.6);
-            
-            // Load frame texture
-            const textureLoader = new THREE.TextureLoader();
-            const frameTexture = textureLoader.load('/api/placeholder/1024/1024'); // Replace with your frame image
-            
-            const frameMaterial = new THREE.MeshBasicMaterial({
-                map: frameTexture,
-                transparent: true,
-                opacity: 0.8,
-                side: THREE.DoubleSide // Visible from both sides
-            });
+            // Create frame group to hold all binary digits
+            frameGroup = new THREE.Group();
+            scene.add(frameGroup);
 
-            frame = new THREE.Mesh(frameGeometry, frameMaterial);
-            frame.position.z = -1; // Place frame 1 unit in front of camera
-            scene.add(frame);
+            // Create binary border
+            createBinaryBorder();
 
             // Add lights
             const light = new THREE.AmbientLight(0xffffff, 1);
             scene.add(light);
 
-            // Handle window resizing
             window.addEventListener('resize', onWindowResize, false);
 
-            // Setup AR button
             const button = document.querySelector('#ar-button');
             button.addEventListener('click', onARButtonClick);
 
-            // Check if AR is available
             if (navigator.xr) {
                 navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
                     if (supported) {
@@ -84,6 +70,86 @@
             }
 
             renderer.setAnimationLoop(render);
+        }
+
+        function createBinaryDigit(value, position, rotation) {
+            const textGeometry = new THREE.TextGeometry(value.toString(), {
+                font: new THREE.Font(), // We'll create a basic shape instead since THREE.Font requires loading
+                size: BORDER_WIDTH * 2,
+                height: 0.001
+            });
+            
+            // Fallback to basic shape if font loading isn't available
+            const digitGeometry = new THREE.PlaneGeometry(BORDER_WIDTH * 2, BORDER_WIDTH * 3);
+            const digitMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x00ff00,
+                transparent: true,
+                opacity: 0.8,
+                side: THREE.DoubleSide
+            });
+            
+            const digit = new THREE.Mesh(digitGeometry, digitMaterial);
+            digit.position.copy(position);
+            digit.rotation.copy(rotation);
+            digit.userData.value = value;
+            
+            return digit;
+        }
+
+        function createBinaryBorder() {
+            const frameWidth = 1.2;
+            const frameHeight = 1.6;
+            const digitSpacing = BORDER_WIDTH * 3;
+            
+            // Calculate number of digits that can fit on each side
+            const topDigits = Math.floor(frameWidth / digitSpacing);
+            const sideDigits = Math.floor(frameHeight / digitSpacing);
+
+            // Create digits for all sides
+            for (let i = 0; i < topDigits; i++) {
+                // Top border
+                const topPosition = new THREE.Vector3(
+                    (i * digitSpacing) - (frameWidth/2),
+                    frameHeight/2,
+                    0
+                );
+                frameGroup.add(createBinaryDigit(i % 2, topPosition, new THREE.Euler()));
+                
+                // Bottom border
+                const bottomPosition = new THREE.Vector3(
+                    (i * digitSpacing) - (frameWidth/2),
+                    -frameHeight/2,
+                    0
+                );
+                frameGroup.add(createBinaryDigit(i % 2, bottomPosition, new THREE.Euler()));
+            }
+
+            for (let i = 0; i < sideDigits; i++) {
+                // Left border
+                const leftPosition = new THREE.Vector3(
+                    -frameWidth/2,
+                    (i * digitSpacing) - (frameHeight/2),
+                    0
+                );
+                frameGroup.add(createBinaryDigit(i % 2, leftPosition, new THREE.Euler()));
+                
+                // Right border
+                const rightPosition = new THREE.Vector3(
+                    frameWidth/2,
+                    (i * digitSpacing) - (frameHeight/2),
+                    0
+                );
+                frameGroup.add(createBinaryDigit(i % 2, rightPosition, new THREE.Euler()));
+            }
+
+            frameGroup.position.z = -1;
+        }
+
+        function updateBinaryValues() {
+            frameGroup.children.forEach(digit => {
+                digit.userData.value = 1 - digit.userData.value; // Toggle between 0 and 1
+                digit.material.opacity = digit.userData.value ? 0.8 : 0.4; // Visual feedback
+            });
         }
 
         async function onARButtonClick() {
@@ -116,18 +182,26 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
+        let lastUpdate = 0;
+        const UPDATE_INTERVAL = 500; // Update every 500ms
+
         function render(timestamp, frame) {
+            // Update binary values periodically
+            if (timestamp - lastUpdate > UPDATE_INTERVAL) {
+                updateBinaryValues();
+                lastUpdate = timestamp;
+            }
+
             if (frame) {
                 const referenceSpace = renderer.xr.getReferenceSpace();
                 const pose = frame.getViewerPose(referenceSpace);
                 
                 if (pose) {
-                    // Update frame to follow camera
                     const view = pose.views[0];
                     const viewMatrix = new THREE.Matrix4().fromArray(view.transform.matrix);
-                    frame.position.setFromMatrixPosition(viewMatrix);
-                    frame.quaternion.setFromRotationMatrix(viewMatrix);
-                    frame.translateZ(-1); // Keep frame 1 unit in front
+                    frameGroup.position.setFromMatrixPosition(viewMatrix);
+                    frameGroup.quaternion.setFromRotationMatrix(viewMatrix);
+                    frameGroup.translateZ(-1);
                 }
             }
             
