@@ -1,139 +1,170 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebXR AR Border Frame</title>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>WebXR Frame Overlay</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden;
+        }
+        #frame-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        #status {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            z-index: 1001;
+        }
+        #arButton {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            z-index: 1002;
+        }
+    </style>
 </head>
 <body>
-    <button id="startAR" style="position: fixed; top: 20px; right: 20px; z-index: 100;">Start AR</button>
-    <script>
-        let camera, scene, renderer;
-        let frame;
+    <div id="status">Starting...</div>
+    
+    <!-- Frame Overlay SVG -->
+    <svg id="frame-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <defs>
+            <linearGradient id="borderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#ff69b4;stop-opacity:0.8" />
+                <stop offset="50%" style="stop-color:#4b0082;stop-opacity:0.8" />
+                <stop offset="100%" style="stop-color:#00bfff;stop-opacity:0.8" />
+            </linearGradient>
+        </defs>
+        <path d="M 0,0 
+                 C 20,0 30,0 50,0 
+                 C 70,0 80,0 100,0 
+                 C 100,20 100,30 100,50 
+                 C 100,70 100,80 100,100 
+                 C 80,100 70,100 50,100 
+                 C 30,100 20,100 0,100 
+                 C 0,80 0,70 0,50 
+                 C 0,30 0,20 0,0 Z" 
+              fill="none" 
+              stroke="url(#borderGradient)" 
+              stroke-width="2"/>
+    </svg>
 
-        init();
+    <script async src="https://unpkg.com/es-module-shims/dist/es-module-shims.js"></script>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.157.0/examples/jsm/"
+        }
+    }
+    </script>
 
-        function init() {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-            
-            renderer = new THREE.WebGLRenderer({ 
-                antialias: true,
-                alpha: true
-            });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true;
-            document.body.appendChild(renderer.domElement);
+    <script type="module">
+        import * as THREE from 'three';
+        import { ARButton } from 'three/addons/webxr/ARButton.js';
 
-            // Create frame geometry
-            const frameGeometry = new THREE.PlaneGeometry(1, 1.5);
-            
-            // Load the border texture
-            const textureLoader = new THREE.TextureLoader();
-            const borderTexture = textureLoader.load('https://github.com/laithi/arjstest/blob/50d5e954ca5bd210460589fceba8a68fe17f751a/pngtree-abstract-fluid-instagram-story-border-png-image_6243695.jpg');
-            
-            const frameMaterial = new THREE.MeshBasicMaterial({
-                map: borderTexture,
-                transparent: true,
-                opacity: 0.8,
-                side: THREE.DoubleSide
-            });
-
-            frame = new THREE.Mesh(frameGeometry, frameMaterial);
-            frame.position.z = -1.5;
-            scene.add(frame);
-
-            // Set up AR button
-            const arButton = document.getElementById('startAR');
-            arButton.addEventListener('click', onStartAR);
-
-            window.addEventListener('resize', onWindowResize, false);
+        const status = document.getElementById('status');
+        
+        function log(message) {
+            console.log(message);
+            status.innerHTML += '<br>' + message;
         }
 
-        async function onStartAR() {
-            if (!navigator.xr) {
-                alert("WebXR not available");
-                return;
-            }
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+        
+        // Renderer setup
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: true,
+            preserveDrawingBuffer: true
+        });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.xr.enabled = true;
+        document.body.appendChild(renderer.domElement);
 
-            try {
-                // Simplified AR session request
-                const session = await navigator.xr.requestSession('immersive-ar', {
-                    optionalFeatures: ['dom-overlay'],
-                    domOverlay: { root: document.body }
-                });
+        // Add lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(0.5, 1, 0.25);
+        scene.add(directionalLight);
 
-                await renderer.xr.setSession(session);
-                session.addEventListener('end', onSessionEnd);
-                
-                // Try to get viewer reference space
-                try {
-                    const referenceSpace = await session.requestReferenceSpace('viewer');
-                    renderer.xr.setReferenceSpace(referenceSpace);
-                } catch (e) {
-                    // If viewer space fails, try local space
-                    try {
-                        const referenceSpace = await session.requestReferenceSpace('local');
-                        renderer.xr.setReferenceSpace(referenceSpace);
-                    } catch (e) {
-                        console.error('Failed to get any reference space');
-                    }
+        // Example content (you can remove this in production)
+        const geometry = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+        const material = new THREE.MeshPhongMaterial({ 
+            color: 0xff0000,
+            shininess: 60
+        });
+        const cube = new THREE.Mesh(geometry, material);
+        cube.position.set(0, 0, -0.5);
+        scene.add(cube);
+
+        // AR Setup
+        navigator.xr.isSessionSupported('immersive-ar')
+            .then((supported) => {
+                if (supported) {
+                    const button = ARButton.createButton(renderer, {
+                        requiredFeatures: ['hit-test'],
+                        optionalFeatures: ['dom-overlay'],
+                        domOverlay: { root: document.body }
+                    });
+                    document.body.appendChild(button);
+                    log('AR ready - Click "Start AR"');
+                } else {
+                    log('AR not supported');
                 }
+            });
 
-                renderer.setAnimationLoop(render);
-            } catch (err) {
-                console.error('Failed to start AR session:', err);
-                alert("Error starting AR session: " + err.message);
-            }
+        // XR Session events
+        renderer.xr.addEventListener('sessionstart', () => {
+            log('AR session started');
+        });
+
+        renderer.xr.addEventListener('sessionend', () => {
+            log('AR session ended');
+        });
+
+        // Animation loop
+        function animate() {
+            renderer.setAnimationLoop((timestamp, frame) => {
+                if (frame) {
+                    cube.rotation.x += 0.01;
+                    cube.rotation.y += 0.01;
+                }
+                renderer.render(scene, camera);
+            });
         }
+        animate();
 
-        function onSessionEnd() {
-            renderer.setAnimationLoop(null);
-        }
-
-        function onWindowResize() {
+        // Handle window resizing
+        window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function render(timestamp, frame) {
-            if (frame) {
-                const session = renderer.xr.getSession();
-                if (session) {
-                    const referenceSpace = renderer.xr.getReferenceSpace();
-                    if (referenceSpace) {
-                        const pose = frame.getViewerPose(referenceSpace);
-                        if (pose) {
-                            const view = pose.views[0];
-                            if (view) {
-                                // Update frame to follow camera
-                                frame.position.set(0, 0, -1.5);
-                                frame.rotation.copy(camera.rotation);
-                            }
-                        }
-                    }
-                }
-            }
-            
-            renderer.render(scene, camera);
-        }
-
-        // Check AR availability
-        if (navigator.xr) {
-            navigator.xr.isSessionSupported('immersive-ar')
-                .then((supported) => {
-                    if (!supported) {
-                        document.getElementById('startAR').disabled = true;
-                        document.getElementById('startAR').textContent = 'AR NOT SUPPORTED';
-                    }
-                });
-        } else {
-            document.getElementById('startAR').disabled = true;
-            document.getElementById('startAR').textContent = 'WebXR NOT AVAILABLE';
-        }
+        });
     </script>
 </body>
 </html>
