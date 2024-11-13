@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebXR Border Frame</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <button id="enterXR" style="position: fixed; top: 20px; right: 20px; z-index: 100;">Enter VR</button>
+    <script>
+        let camera, scene, renderer;
+        let frame;
+
+        init();
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            // Create frame geometry that sits in front of the camera
+            const frameGeometry = new THREE.PlaneGeometry(2, 2);
+            
+            // Load the border texture
+            const textureLoader = new THREE.TextureLoader();
+            const borderTexture = textureLoader.load('https://github.com/laithi/arjstest/blob/50d5e954ca5bd210460589fceba8a68fe17f751a/pngtree-abstract-fluid-instagram-story-border-png-image_6243695.jpg');
+            
+            const frameMaterial = new THREE.MeshBasicMaterial({
+                map: borderTexture,
+                transparent: true,
+                opacity: 1
+            });
+
+            frame = new THREE.Mesh(frameGeometry, frameMaterial);
+            
+            // Position the frame slightly in front of the camera
+            frame.position.z = -2;
+            
+            // Add frame to the scene
+            scene.add(frame);
+
+            // Set up VR button
+            document.getElementById('enterXR').addEventListener('click', onEnterVR);
+
+            // Handle window resizing
+            window.addEventListener('resize', onWindowResize, false);
+
+            // Start the animation loop
+            renderer.setAnimationLoop(animate);
+        }
+
+        function onEnterVR() {
+            renderer.xr.getSession().requestReferenceSpace('local').then((space) => {
+                // Update frame position relative to the viewer
+                frame.position.z = -2;
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            // Ensure frame always faces the camera
+            frame.quaternion.copy(camera.quaternion);
+            
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
