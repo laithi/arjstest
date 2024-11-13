@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebXR AR Binary Frame</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <title>AR Binary Border</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { margin: 0; }
         canvas { display: block; }
@@ -17,196 +17,162 @@
             background: #2196F3;
             color: white;
             cursor: pointer;
+            z-index: 1000;
+        }
+        #binary-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            border: 5px solid transparent;
+            z-index: 999;
+        }
+        .binary-text {
+            position: absolute;
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 12px;
+            line-height: 12px;
+            text-shadow: 0 0 2px #000;
         }
     </style>
 </head>
 <body>
     <button id="ar-button">Start AR</button>
+    <div id="binary-overlay"></div>
+
     <script>
-        let camera, scene, renderer;
-        let frameGroup;
-        const BORDER_WIDTH = 0.005; // 5px equivalent in 3D units
-
-        init();
-
-        async function init() {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            
-            renderer = new THREE.WebGLRenderer({ 
-                antialias: true,
-                alpha: true
-            });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true;
-            document.body.appendChild(renderer.domElement);
-
-            // Create frame group to hold all binary digits
-            frameGroup = new THREE.Group();
-            scene.add(frameGroup);
-
-            // Create binary border
-            createBinaryBorder();
-
-            // Add lights
-            const light = new THREE.AmbientLight(0xffffff, 1);
-            scene.add(light);
-
-            window.addEventListener('resize', onWindowResize, false);
-
-            const button = document.querySelector('#ar-button');
-            button.addEventListener('click', onARButtonClick);
-
-            if (navigator.xr) {
-                navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-                    if (supported) {
-                        button.disabled = false;
-                    } else {
-                        button.textContent = 'AR Not Supported';
-                    }
-                });
-            } else {
-                button.textContent = 'XR Not Available';
-            }
-
-            renderer.setAnimationLoop(render);
-        }
-
-        function createBinaryDigit(value, position, rotation) {
-            const textGeometry = new THREE.TextGeometry(value.toString(), {
-                font: new THREE.Font(), // We'll create a basic shape instead since THREE.Font requires loading
-                size: BORDER_WIDTH * 2,
-                height: 0.001
-            });
-            
-            // Fallback to basic shape if font loading isn't available
-            const digitGeometry = new THREE.PlaneGeometry(BORDER_WIDTH * 2, BORDER_WIDTH * 3);
-            const digitMaterial = new THREE.MeshBasicMaterial({ 
-                color: 0x00ff00,
-                transparent: true,
-                opacity: 0.8,
-                side: THREE.DoubleSide
-            });
-            
-            const digit = new THREE.Mesh(digitGeometry, digitMaterial);
-            digit.position.copy(position);
-            digit.rotation.copy(rotation);
-            digit.userData.value = value;
-            
-            return digit;
-        }
-
+        let isRunning = false;
+        const overlay = document.getElementById('binary-overlay');
+        const binaryChars = ['0', '1'];
+        
         function createBinaryBorder() {
-            const frameWidth = 1.2;
-            const frameHeight = 1.6;
-            const digitSpacing = BORDER_WIDTH * 3;
+            // Clear existing content
+            overlay.innerHTML = '';
             
-            // Calculate number of digits that can fit on each side
-            const topDigits = Math.floor(frameWidth / digitSpacing);
-            const sideDigits = Math.floor(frameHeight / digitSpacing);
-
-            // Create digits for all sides
-            for (let i = 0; i < topDigits; i++) {
-                // Top border
-                const topPosition = new THREE.Vector3(
-                    (i * digitSpacing) - (frameWidth/2),
-                    frameHeight/2,
-                    0
-                );
-                frameGroup.add(createBinaryDigit(i % 2, topPosition, new THREE.Euler()));
-                
-                // Bottom border
-                const bottomPosition = new THREE.Vector3(
-                    (i * digitSpacing) - (frameWidth/2),
-                    -frameHeight/2,
-                    0
-                );
-                frameGroup.add(createBinaryDigit(i % 2, bottomPosition, new THREE.Euler()));
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const spacing = 15; // Space between binary digits
+            
+            // Calculate number of characters needed
+            const horizontalCount = Math.floor(width / spacing);
+            const verticalCount = Math.floor(height / spacing);
+            
+            // Create top and bottom rows
+            for (let i = 0; i < horizontalCount; i++) {
+                // Top row
+                createBinaryElement(i * spacing, 0);
+                // Bottom row
+                createBinaryElement(i * spacing, height - 12);
             }
-
-            for (let i = 0; i < sideDigits; i++) {
-                // Left border
-                const leftPosition = new THREE.Vector3(
-                    -frameWidth/2,
-                    (i * digitSpacing) - (frameHeight/2),
-                    0
-                );
-                frameGroup.add(createBinaryDigit(i % 2, leftPosition, new THREE.Euler()));
-                
-                // Right border
-                const rightPosition = new THREE.Vector3(
-                    frameWidth/2,
-                    (i * digitSpacing) - (frameHeight/2),
-                    0
-                );
-                frameGroup.add(createBinaryDigit(i % 2, rightPosition, new THREE.Euler()));
+            
+            // Create left and right columns
+            for (let i = 0; i < verticalCount; i++) {
+                // Left column
+                createBinaryElement(0, i * spacing);
+                // Right column
+                createBinaryElement(width - 12, i * spacing);
             }
-
-            frameGroup.position.z = -1;
         }
-
+        
+        function createBinaryElement(x, y) {
+            const span = document.createElement('span');
+            span.className = 'binary-text';
+            span.style.left = `${x}px`;
+            span.style.top = `${y}px`;
+            span.textContent = binaryChars[Math.floor(Math.random() * 2)];
+            overlay.appendChild(span);
+        }
+        
         function updateBinaryValues() {
-            frameGroup.children.forEach(digit => {
-                digit.userData.value = 1 - digit.userData.value; // Toggle between 0 and 1
-                digit.material.opacity = digit.userData.value ? 0.8 : 0.4; // Visual feedback
+            const elements = document.getElementsByClassName('binary-text');
+            for (let element of elements) {
+                element.textContent = binaryChars[Math.floor(Math.random() * 2)];
+            }
+        }
+        
+        async function initAR() {
+            const button = document.getElementById('ar-button');
+            
+            if (!navigator.xr) {
+                button.textContent = 'WebXR Not Available';
+                button.disabled = true;
+                return;
+            }
+            
+            try {
+                const supported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!supported) {
+                    button.textContent = 'AR Not Supported';
+                    button.disabled = true;
+                    return;
+                }
+            } catch (error) {
+                console.error(error);
+                button.textContent = 'AR Error';
+                button.disabled = true;
+                return;
+            }
+            
+            button.addEventListener('click', async () => {
+                if (isRunning) {
+                    isRunning = false;
+                    overlay.style.display = 'none';
+                    button.textContent = 'Start AR';
+                    try {
+                        const session = renderer.xr.getSession();
+                        if (session) {
+                            await session.end();
+                        }
+                    } catch (error) {
+                        console.error(error);
+                    }
+                } else {
+                    try {
+                        const session = await navigator.xr.requestSession('immersive-ar', {
+                            optionalFeatures: ['dom-overlay'],
+                            domOverlay: { root: document.body }
+                        });
+                        
+                        isRunning = true;
+                        button.textContent = 'Stop AR';
+                        overlay.style.display = 'block';
+                        createBinaryBorder();
+                        
+                        session.addEventListener('end', () => {
+                            isRunning = false;
+                            overlay.style.display = 'none';
+                            button.textContent = 'Start AR';
+                        });
+                        
+                        // Start the animation
+                        animateBinary();
+                    } catch (error) {
+                        console.error(error);
+                        button.textContent = 'AR Start Error';
+                    }
+                }
             });
         }
-
-        async function onARButtonClick() {
-            if (renderer.xr.isPresenting) {
-                renderer.xr.getSession().end();
-            } else {
-                try {
-                    const session = await navigator.xr.requestSession('immersive-ar', {
-                        requiredFeatures: ['hit-test'],
-                        optionalFeatures: ['dom-overlay'],
-                        domOverlay: { root: document.body }
-                    });
-                    
-                    renderer.xr.setReferenceSpaceType('local');
-                    await renderer.xr.setSession(session);
-                    document.querySelector('#ar-button').textContent = 'Exit AR';
-                    
-                    session.addEventListener('end', () => {
-                        document.querySelector('#ar-button').textContent = 'Start AR';
-                    });
-                } catch (error) {
-                    console.error('Error starting AR session:', error);
-                }
-            }
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        let lastUpdate = 0;
-        const UPDATE_INTERVAL = 500; // Update every 500ms
-
-        function render(timestamp, frame) {
-            // Update binary values periodically
-            if (timestamp - lastUpdate > UPDATE_INTERVAL) {
+        
+        function animateBinary() {
+            if (isRunning) {
                 updateBinaryValues();
-                lastUpdate = timestamp;
+                setTimeout(animateBinary, 500); // Update every 500ms
             }
-
-            if (frame) {
-                const referenceSpace = renderer.xr.getReferenceSpace();
-                const pose = frame.getViewerPose(referenceSpace);
-                
-                if (pose) {
-                    const view = pose.views[0];
-                    const viewMatrix = new THREE.Matrix4().fromArray(view.transform.matrix);
-                    frameGroup.position.setFromMatrixPosition(viewMatrix);
-                    frameGroup.quaternion.setFromRotationMatrix(viewMatrix);
-                    frameGroup.translateZ(-1);
-                }
-            }
-            
-            renderer.render(scene, camera);
         }
+        
+        // Handle window resizing
+        window.addEventListener('resize', () => {
+            if (isRunning) {
+                createBinaryBorder();
+            }
+        });
+        
+        // Initialize
+        initAR();
     </script>
 </body>
 </html>
