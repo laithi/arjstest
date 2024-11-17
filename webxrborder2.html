@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AR Camera Experience</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
+    <style>
+        .ar-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            gap: 20px;
+        }
+
+        .ar-button {
+            padding: 15px 30px;
+            border-radius: 25px;
+            border: none;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(5px);
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .ar-button:hover {
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .recording {
+            background: rgba(255, 0, 0, 0.8) !important;
+        }
+
+        #frame-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+    <!-- AR Scene Container -->
+    <a-scene 
+        webxr="optionalFeatures: dom-overlay; overlayElement: #overlay;"
+        device-orientation-permission-ui="enabled: false"
+        renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true"
+        vr-mode-ui="enabled: false">
+
+        <!-- Asset Management System -->
+        <a-assets>
+            <img id="frame" src="path/to/your/frame.png" crossorigin="anonymous">
+        </a-assets>
+
+        <!-- Camera Setup -->
+        <a-entity position="0 1.6 0">
+            <a-camera look-controls="enabled: true"></a-camera>
+        </a-entity>
+
+        <!-- Environment Setup -->
+        <a-entity light="type: ambient; intensity: 0.5"></a-entity>
+        <a-entity light="type: directional; intensity: 0.8; position: -1 1 0"></a-entity>
+    </a-scene>
+
+    <!-- Frame Overlay -->
+    <img id="frame-overlay" src="path/to/your/frame.png" alt="frame">
+
+    <!-- Control Buttons -->
+    <div class="ar-controls" id="overlay">
+        <button class="ar-button" id="photo-btn">Take Photo</button>
+        <button class="ar-button" id="video-btn">Record Video</button>
+    </div>
+
+    <script>
+        // Media capture functionality
+        class ARMediaCapture {
+            constructor() {
+                this.isRecording = false;
+                this.mediaRecorder = null;
+                this.chunks = [];
+                this.stream = null;
+
+                this.initButtons();
+                this.checkPermissions();
+            }
+
+            async checkPermissions() {
+                try {
+                    // Request necessary permissions
+                    await navigator.mediaDevices.getUserMedia({ video: true });
+                    // Check if we can access the file system
+                    if ('chooseFileSystemEntries' in window || 'showSaveFilePicker' in window) {
+                        console.log('File System Access API is supported');
+                    }
+                } catch (err) {
+                    console.error('Permission error:', err);
+                    alert('Please grant camera permissions for AR functionality');
+                }
+            }
+
+            initButtons() {
+                const photoBtn = document.getElementById('photo-btn');
+                const videoBtn = document.getElementById('video-btn');
+
+                photoBtn.addEventListener('click', () => this.takePhoto());
+                videoBtn.addEventListener('click', () => this.toggleRecording());
+            }
+
+            async takePhoto() {
+                try {
+                    const scene = document.querySelector('a-scene');
+                    const data = scene.components.screenshot.getCanvas('perspective').toDataURL('image/png');
+                    
+                    // Save the image
+                    const blob = await (await fetch(data)).blob();
+                    this.saveFile(blob, 'AR-Photo.png', 'image/png');
+                } catch (err) {
+                    console.error('Error taking photo:', err);
+                    alert('Failed to capture photo');
+                }
+            }
+
+            async toggleRecording() {
+                const videoBtn = document.getElementById('video-btn');
+
+                if (!this.isRecording) {
+                    // Start recording
+                    try {
+                        const stream = document.querySelector('a-scene').canvas.captureStream();
+                        this.mediaRecorder = new MediaRecorder(stream, {
+                            mimeType: 'video/webm;codecs=vp9'
+                        });
+
+                        this.chunks = [];
+                        this.mediaRecorder.ondataavailable = (e) => this.chunks.push(e.data);
+                        this.mediaRecorder.onstop = () => this.saveRecording();
+
+                        this.mediaRecorder.start();
+                        this.isRecording = true;
+                        videoBtn.textContent = 'Stop Recording';
+                        videoBtn.classList.add('recording');
+                    } catch (err) {
+                        console.error('Error starting recording:', err);
+                        alert('Failed to start recording');
+                    }
+                } else {
+                    // Stop recording
+                    this.mediaRecorder.stop();
+                    this.isRecording = false;
+                    videoBtn.textContent = 'Record Video';
+                    videoBtn.classList.remove('recording');
+                }
+            }
+
+            async saveRecording() {
+                const blob = new Blob(this.chunks, { type: 'video/webm' });
+                this.saveFile(blob, 'AR-Recording.webm', 'video/webm');
+            }
+
+            async saveFile(blob, fileName, mimeType) {
+                try {
+                    // Try using the File System Access API
+                    if ('showSaveFilePicker' in window) {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: fileName,
+                            types: [{
+                                description: 'Media File',
+                                accept: { [mimeType]: [`.${fileName.split('.').pop()}`] }
+                            }]
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                    } else {
+                        // Fallback to traditional download
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = fileName;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    }
+                } catch (err) {
+                    console.error('Error saving file:', err);
+                    alert('Failed to save file');
+                }
+            }
+        }
+
+        // Initialize AR experience when the scene loads
+        document.querySelector('a-scene').addEventListener('loaded', () => {
+            // Initialize media capture functionality
+            const mediaCapture = new ARMediaCapture();
+
+            // Set up cross-browser compatibility
+            if (navigator.xr) {
+                navigator.xr.isSessionSupported('immersive-ar')
+                    .then((supported) => {
+                        if (!supported) {
+                            alert('AR is not supported on this device/browser');
+                        }
+                    })
+                    .catch(err => console.error('Error checking AR support:', err));
+            }
+
+            // Performance optimization
+            const scene = document.querySelector('a-scene');
+            scene.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            scene.renderer.sortObjects = false;
+            
+            // Additional optimization for mobile
+            if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                scene.renderer.setSize(
+                    window.innerWidth * 0.8,
+                    window.innerHeight * 0.8
+                );
+            }
+        });
+    </script>
+</body>
+</html>
