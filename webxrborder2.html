@@ -1,32 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Basic AR Camera</title>
+    <title>Basic AR Camera Test</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
     <style>
-        .controls {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            display: flex;
-            gap: 10px;
-        }
-
-        button {
-            padding: 10px 20px;
-            background: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        .recording {
-            background: red;
-            color: white;
-        }
-
         #status {
             position: fixed;
             top: 10px;
@@ -34,157 +11,85 @@
             background: rgba(0, 0, 0, 0.7);
             color: white;
             padding: 10px;
+            z-index: 1000;
+        }
+        
+        #arButton {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            background: white;
+            border: none;
             border-radius: 5px;
             z-index: 1000;
         }
     </style>
 </head>
 <body>
-    <!-- Status display -->
-    <div id="status">Checking AR support...</div>
+    <div id="status">Initializing...</div>
+    <button id="arButton">Start AR</button>
 
-    <!-- Basic AR Scene -->
     <a-scene 
-        webxr="requiredFeatures: hit-test,dom-overlay; 
-               overlayElement: #overlay;"
-        device-orientation-permission-ui="enabled: false">
+        webxr="optionalFeatures: dom-overlay; 
+               overlayElement: #overlay;
+               requiredFeatures: hit-test;"
+        vr-mode-ui="enabled: false">
         
         <!-- Camera -->
-        <a-entity position="0 1.6 0">
-            <a-camera></a-camera>
-        </a-entity>
-
-        <!-- Basic light -->
-        <a-entity light="type: ambient; intensity: 1"></a-entity>
+        <a-camera></a-camera>
+        
+        <!-- Add a simple cube as a visual reference -->
+        <a-box position="0 1.6 -3" color="red"></a-box>
     </a-scene>
 
-    <!-- Control buttons -->
-    <div class="controls" id="overlay">
-        <button id="photoBtn">Take Photo</button>
-        <button id="videoBtn">Start Recording</button>
-    </div>
-
     <script>
-        // Main class to handle AR functionality
-        class BasicARCamera {
-            constructor() {
-                this.isRecording = false;
-                this.mediaRecorder = null;
-                this.recordedChunks = [];
-                this.statusElement = document.getElementById('status');
+        window.onload = async function() {
+            const status = document.getElementById('status');
+            const arButton = document.getElementById('arButton');
+            const scene = document.querySelector('a-scene');
 
-                this.init();
+            // Check for AR support
+            if (!navigator.xr) {
+                status.textContent = 'WebXR not available';
+                return;
             }
 
-            async init() {
-                try {
-                    // Check AR support
-                    if (!navigator.xr) {
-                        throw new Error('WebXR not available');
-                    }
-
-                    const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
-                    if (!isSupported) {
-                        throw new Error('AR not supported on this device');
-                    }
-
-                    // Check camera access
-                    await navigator.mediaDevices.getUserMedia({ video: true });
-                    
-                    this.statusElement.textContent = 'AR Ready! ✓';
-                    this.setupButtons();
-                } catch (error) {
-                    this.statusElement.textContent = `Error: ${error.message}`;
-                    console.error('Setup error:', error);
+            try {
+                const supported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!supported) {
+                    status.textContent = 'AR not supported on this device';
+                    return;
                 }
-            }
 
-            setupButtons() {
-                // Photo capture
-                document.getElementById('photoBtn').addEventListener('click', () => {
-                    this.capturePhoto();
-                });
+                status.textContent = 'AR supported! Click button to start.';
+                arButton.style.display = 'block';
 
-                // Video recording
-                document.getElementById('videoBtn').addEventListener('click', () => {
-                    this.toggleRecording();
-                });
-            }
-
-            capturePhoto() {
-                try {
-                    const scene = document.querySelector('a-scene');
-                    const img = scene.components.screenshot.getCanvas('perspective').toDataURL('image/png');
-                    
-                    // Create download link
-                    const link = document.createElement('a');
-                    link.href = img;
-                    link.download = `AR-Photo-${Date.now()}.png`;
-                    link.click();
-                    
-                    this.statusElement.textContent = 'Photo captured! ✓';
-                    setTimeout(() => this.statusElement.textContent = 'AR Ready! ✓', 2000);
-                } catch (error) {
-                    this.statusElement.textContent = 'Failed to capture photo';
-                    console.error('Photo capture error:', error);
-                }
-            }
-
-            toggleRecording() {
-                const videoBtn = document.getElementById('videoBtn');
-                
-                if (!this.isRecording) {
+                // Handle AR session start
+                arButton.addEventListener('click', async () => {
                     try {
-                        // Start recording
-                        const scene = document.querySelector('a-scene');
-                        const stream = scene.canvas.captureStream();
-                        this.recordedChunks = [];
-                        
-                        this.mediaRecorder = new MediaRecorder(stream, {
-                            mimeType: 'video/webm;codecs=vp9'
+                        // Request camera permissions explicitly
+                        await navigator.mediaDevices.getUserMedia({ 
+                            video: { facingMode: 'environment' }, 
+                            audio: false 
                         });
 
-                        this.mediaRecorder.ondataavailable = (event) => {
-                            if (event.data.size > 0) {
-                                this.recordedChunks.push(event.data);
-                            }
-                        };
-
-                        this.mediaRecorder.onstop = () => {
-                            const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = `AR-Recording-${Date.now()}.webm`;
-                            link.click();
-                            URL.revokeObjectURL(url);
-                        };
-
-                        this.mediaRecorder.start();
-                        this.isRecording = true;
-                        videoBtn.textContent = 'Stop Recording';
-                        videoBtn.classList.add('recording');
-                        this.statusElement.textContent = 'Recording... ⏺';
-                    } catch (error) {
-                        this.statusElement.textContent = 'Failed to start recording';
-                        console.error('Recording error:', error);
+                        // Enter AR mode
+                        scene.enterAR();
+                        status.textContent = 'AR active';
+                        arButton.style.display = 'none';
+                    } catch (err) {
+                        status.textContent = `Error: ${err.message}`;
+                        console.error('AR start error:', err);
                     }
-                } else {
-                    // Stop recording
-                    this.mediaRecorder.stop();
-                    this.isRecording = false;
-                    videoBtn.textContent = 'Start Recording';
-                    videoBtn.classList.remove('recording');
-                    this.statusElement.textContent = 'Recording saved! ✓';
-                    setTimeout(() => this.statusElement.textContent = 'AR Ready! ✓', 2000);
-                }
-            }
-        }
+                });
 
-        // Initialize when the scene is loaded
-        document.querySelector('a-scene').addEventListener('loaded', () => {
-            new BasicARCamera();
-        });
+            } catch (err) {
+                status.textContent = `Error checking AR support: ${err.message}`;
+                console.error('Setup error:', err);
+            }
+        };
     </script>
 </body>
 </html>
