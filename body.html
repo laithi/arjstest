@@ -1,111 +1,429 @@
-<!-- Copyright (c) 2023 8th Wall, Inc. -->
-<!-- body.html is optional; elements will be added to your html body after app.js is loaded. -->
-<a-scene 
-landing-page
-ui-manager
-xrextras-loading
-xrextras-runtime-error
-xrface="uvType: standard; maxDetections:1; allowedDevices: any; cameraDirection: front; mirroredDisplay: true">
 
-  <!-- 3D models, images, videos -->
-  <a-assets>
-    <a-asset-item id="head-occluder" src="./assets/head-occluder.glb"></a-asset-item>
-  </a-assets>
+                        <!DOCTYPE html>
+                        <html lang="en">
+                        <head>
+                            <meta charset="UTF-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                body {
+                  background-color: white; /* Ensure the iframe has a white background */
+                }
+    
+                
+              </style>
+                        </head>
+                        <body>
+                            <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebAR Face Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@0.0.3/dist/face-landmarks-detection.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
 
-  <!-- Face mesh assets-->
-  <xrextras-resource id="lipstick-alpha" src="./assets/alpha-masks/lipstick-alpha.png"> </xrextras-resource>
-  <xrextras-resource id="brows-alpha" src="./assets/alpha-masks/brows-alpha.png"> </xrextras-resource>
-  <xrextras-resource id="lowerLashes-alpha" src="./assets/alpha-masks/lowerLashes-alpha.png"> </xrextras-resource>
-  <xrextras-resource id="eyeliner-alpha" src="./assets/alpha-masks/eyeliner-alpha.png"> </xrextras-resource>
-  <xrextras-resource id="eyeshadow-alpha" src="./assets/alpha-masks/eyeshadow-alpha.png"> </xrextras-resource>
-  <xrextras-resource id="blush-alpha" src="./assets/alpha-masks/blush-alpha.png"> </xrextras-resource>
-  <xrextras-resource id="contacts-alpha" src="./assets/alpha-masks/contacts-alpha.png"> </xrextras-resource>
-  <xrextras-resource id="uv" src="./assets/unwrappedUV.png"> </xrextras-resource>
-  
-  <a-camera look-controls="enabled: false" wasd-controls="enabled: false" position="0 2 0"></a-camera>
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: white;
+        }
 
-  <a-entity gltf-model="#head-occluder" position="0 0 0.02" xrextras-hider-material></a-entity>
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+        }
 
-  <!-- makeup textured on face -->
-  <xrextras-faceanchor id="face-anchor" color-picker="makeup: lipstick">
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
 
-    <xrextras-face-mesh 
-      id="eyebrows"
-      material="shader:standard; visible: true; color:#4e372d; transparent:true; opacity:0.5" 
-      alpha-map="#brows-alpha">
-    </xrextras-face-mesh>
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
 
-    <xrextras-face-mesh 
-      id="eyeshadow"
-      material="shader:standard; visible: true; color:#b56984; roughness: 0.6; transparent:true; opacity:0.5"
-      alpha-map="#eyeshadow-alpha">
-    </xrextras-face-mesh>
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+            width: 100%;
+            max-width: 1200px;
+        }
 
-    <xrextras-face-mesh 
-      id="eyeliner"
-      material="shader:standard; visible: false; color:#000000; roughness: 0.5; transparent:true; opacity:0.7" 
-      alpha-map="#eyeliner-alpha">
-    </xrextras-face-mesh>
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
 
-    <xrextras-face-attachment point="leftIris" hide-contacts>
-      <a-cylinder 
-        id="leftIris"
-        alpha-map="#contacts-alpha" 
-        scale="0.9 0.9 0.9" 
-        height=".01" 
-        radius=".055" 
-        position="0 0 0.01" 
-        rotation="90 0 0" 
-        material="color:#A9D6EA; roughness:0.1; transparent:true; opacity:0.3">
-      </a-cylinder>
-    </xrextras-face-attachment>
+        #video {
+            width: 100%;
+            display: block;
+            background: #000;
+        }
 
-    <xrextras-face-attachment point="rightIris">
-      <a-cylinder 
-        id="rightIris"
-        alpha-map="#contacts-alpha"  
-        scale="0.9 0.9 0.9" 
-        height=".01" 
-        radius=".055" 
-        position="-0.003 0 0.01" 
-        rotation="90 0 0" 
-        material="color:#A9D6EA; roughness:0.1; transparent:true; opacity:0.3"></a-cylinder>
-    </xrextras-face-attachment>
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
 
-    <xrextras-face-mesh 
-      id="lowerLashes"
-      material="shader:standard; visible: true; color:#000000; transparent:true; opacity:0.3" 
-      alpha-map="#lowerLashes-alpha">
-    </xrextras-face-mesh>
+        .controls {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
 
-    <xrextras-face-mesh 
-      id="blush"
-      material="shader:standard; visible: true; color:#a84856; transparent:true; opacity:0.8" 
-      alpha-map="#blush-alpha">
-    </xrextras-face-mesh>
+        .btn {
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            border: none;
+            border-radius: 50px;
+            background: linear-gradient(45deg, #ff6b6b, #ffa502);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+        }
 
-    <xrextras-face-mesh
-      id="lipstick" 
-      material="shader:standard; visible:true; roughness: 0.5; color:#8b3737; transparent:true; opacity:0.45" 
-      alpha-map="#lipstick-alpha">
-    </xrextras-face-mesh>
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.6);
+        }
 
-  </xrextras-faceanchor>
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
 
-  <a-light type="directional" target="#face" position="0 1.8 3" intensity="0.8"></a-light>
-  <a-light type="ambient" intensity="0.5"></a-light>
+        .status {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
 
-</a-scene>
+        .features {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
 
-<!-- UI Tabs at the bottom -->
-<div id="modal">
-  <div id="container"></div>
-</div>
+        .feature-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            min-width: 250px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
 
-<!-- UI Buttons used to change colors -->
-<div id="palette"></div>
-<div id='colorParent'>
-  <input id="color-input" type="color" name="color" value="#000000">
-</div>
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: #ffa502;
+        }
 
-Other Work by 8th Wall
+        .feature-title {
+            font-size: 1.4rem;
+            margin-bottom: 10px;
+        }
+
+        .instructions {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 25px;
+            border-radius: 15px;
+            max-width: 800px;
+            margin-top: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .instructions h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #ffa502;
+        }
+
+        .instructions ol {
+            padding-left: 25px;
+        }
+
+        .instructions li {
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .header p {
+                font-size: 1rem;
+            }
+            
+            .btn {
+                padding: 12px 25px;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="fas fa-camera"></i> WebAR Face Tracker</h1>
+        <p>Real-time face detection with bounding boxes using TensorFlow.js</p>
+    </div>
+
+    <div class="container">
+        <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" class="btn">
+                <i class="fas fa-play"></i> Start Camera
+            </button>
+            <button id="stopBtn" class="btn" disabled>
+                <i class="fas fa-stop"></i> Stop Camera
+            </button>
+        </div>
+
+        <div class="status" id="status">
+            Click "Start Camera" to begin face detection
+        </div>
+
+        <div class="features">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <h3 class="feature-title">Real-Time</h3>
+                <p>Live face detection at 30+ FPS</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <h3 class="feature-title">AI Powered</h3>
+                <p>Powered by TensorFlow.js machine learning</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h3 class="feature-title">Privacy First</h3>
+                <p>All processing happens in your browser</p>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h2>How It Works</h2>
+            <ol>
+                <li>Click "Start Camera" to activate your webcam</li>
+                <li>Position your face in front of the camera</li>
+                <li>Watch as the AI detects your face and draws a bounding box</li>
+                <li>Move around to see real-time tracking</li>
+                <li>Click "Stop Camera" when finished</li>
+            </ol>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script>
+        let video = document.getElementById('video');
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
+        let startBtn = document.getElementById('startBtn');
+        let stopBtn = document.getElementById('stopBtn');
+        let status = document.getElementById('status');
+        
+        let stream = null;
+        let model = null;
+        let detectionInterval = null;
+        let isDetecting = false;
+
+        // Initialize the face detection model
+        async function loadModel() {
+            try {
+                status.textContent = 'Loading AI model...';
+                model = await faceLandmarksDetection.load(
+                    faceLandmarksDetection.SupportedPackages.mediapipeFacemesh,
+                    {maxFaces: 1}
+                );
+                status.textContent = 'Model loaded! Click "Start Camera" to begin.';
+            } catch (error) {
+                console.error('Error loading model:', error);
+                status.textContent = 'Error loading model. Please try again.';
+            }
+        }
+
+        // Start camera
+        async function startCamera() {
+            if (!model) {
+                status.textContent = 'Please wait for model to load...';
+                return;
+            }
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'user',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    status.textContent = 'Camera active. Starting face detection...';
+                    startDetection();
+                };
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                status.textContent = 'Error accessing camera. Please check permissions.';
+            }
+        }
+
+        // Stop camera
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            if (detectionInterval) {
+                clearInterval(detectionInterval);
+                detectionInterval = null;
+            }
+            isDetecting = false;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            status.textContent = 'Camera stopped. Click "Start Camera" to begin again.';
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Start face detection
+        function startDetection() {
+            if (isDetecting) return;
+            isDetecting = true;
+            
+            detectionInterval = setInterval(async () => {
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    try {
+                        const predictions = await model.estimateFaces({
+                            input: video,
+                            returnTensors: false,
+                            flipHorizontal: false,
+                            predictIrises: false
+                        });
+                        
+                        // Clear canvas
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        
+                        // Draw bounding boxes
+                        predictions.forEach(prediction => {
+                            const boundingBox = prediction.boundingBox;
+                            const [x, y] = boundingBox.topLeft;
+                            const [x2, y2] = boundingBox.bottomRight;
+                            const width = x2 - x;
+                            const height = y2 - y;
+                            
+                            // Draw rectangle
+                            ctx.strokeStyle = '#00ff00';
+                            ctx.lineWidth = 3;
+                            ctx.strokeRect(x, y, width, height);
+                            
+                            // Draw label background
+                            ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
+                            ctx.fillRect(x, y - 20, 80, 20);
+                            
+                            // Draw label text
+                            ctx.fillStyle = '#000';
+                            ctx.font = '14px Arial';
+                            ctx.fillText('Face Detected', x + 5, y - 5);
+                        });
+                        
+                        status.textContent = predictions.length > 0 
+                            ? `Face detected! Tracking ${predictions.length} face(s)` 
+                            : 'No face detected. Please position your face in the frame.';
+                    } catch (error) {
+                        console.error('Detection error:', error);
+                    }
+                }
+            }, 1000 / 30); // ~30 FPS
+        }
+
+        // Event listeners
+        startBtn.addEventListener('click', startCamera);
+        stopBtn.addEventListener('click', stopCamera);
+
+        // Initialize
+        window.addEventListener('load', () => {
+            loadModel();
+        });
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && isDetecting) {
+                stopCamera();
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (video.srcObject) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+    
+              <script>
+                              
+              </script>
+                        </body>
+                        </html>
+                    
