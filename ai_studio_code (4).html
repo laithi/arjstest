@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WebAR Face Makeup</title>
+    <!-- استيراد مكتبة A-Frame -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <!-- استيراد مكتبة MindAR المخصصة لتتبع الوجه -->
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-face-aframe.prod.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        /* رسالة توجيه للمستخدم */
+        #loading {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+<body>
+    
+    <div id="loading">جاري تحميل نموذج الوجه... ⌛</div>
+
+    <!-- إعداد المشهد مع تفعيل تتبع الوجه (mindar-face) -->
+    <a-scene mindar-face embedded color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+        
+        <!-- الأصول (Assets) -->
+        <a-assets>
+            <!-- هنا نقوم بتعريف نموذج قناع الوجه الافتراضي الذي توفره المكتبة -->
+            <a-asset-item id="headModel" src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/src/face-target/faceMesh.glb"></a-asset-item>
+        </a-assets>
+
+        <!-- الكاميرا -->
+        <a-camera active="false" position="0 0 0"></a-camera>
+
+        <!-- العنصر الذي سيتبع الوجه -->
+        <!-- mindar-face-target="anchorIndex: 1" يربط العنصر بنقطة الأنف -->
+        <a-entity mindar-face-target="anchorIndex: 1">
+            
+            <!-- 
+                تأثير المكياج الرقمي:
+                نقوم بإضافة شبكة الوجه (Face Mesh) ونعطيها لوناً وشفافية
+                لتبدو وكأنها مكياج أو قناع سايبر
+            -->
+            <a-gltf-model rotation="0 0 0" position="0 0 0" scale="1 1 1" src="#headModel" 
+                visible="true">
+            </a-gltf-model>
+            
+        </a-entity>
+
+    </a-scene>
+
+    <script>
+        const scene = document.querySelector('a-scene');
+        const loading = document.getElementById('loading');
+
+        // حدث عندما يصبح النظام جاهزاً
+        scene.addEventListener("arReady", (event) => {
+            loading.style.display = "none"; // إخفاء شاشة التحميل
+            console.log("MindAR is ready");
+        });
+
+        // تخصيص "المكياج" برمجياً لتغيير لون القناع
+        scene.addEventListener("loaded", () => {
+            const model = document.querySelector('a-gltf-model');
+            
+            model.addEventListener('model-loaded', () => {
+                const mesh = model.getObject3D('mesh');
+                mesh.traverse((node) => {
+                    if (node.isMesh) {
+                        // تعديل خامة الوجه (Material)
+                        // هنا نصنع تأثير "أحمر خدود" كامل أو قناع
+                        node.material.transparent = true;
+                        node.material.opacity = 0.4; // درجة الشفافية
+                        node.material.color.setHex(0xff0055); // لون وردي/أحمر (مثل الروج أو البلاش)
+                        node.material.roughness = 0.5;
+                        node.material.metalness = 0.1;
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
